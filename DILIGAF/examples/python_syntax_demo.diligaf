@@ -1,0 +1,299 @@
+;; DILIGAF Python-like Syntax Demo
+;; Clean, indentation-based syntax with classes, def, and stackit
+
+;; =============================================================================
+;; DILIGAF PYTHON-LIKE SYNTAX DEMONSTRATION
+;; =============================================================================
+
+(define main
+  (lambda ()
+    (print "DILIGAF Python-like Syntax Demo")
+    (print "===============================")
+    (print)
+    
+    (define interpreter (diligaf-python-interpreter))
+    
+    ;; Test 1: Basic syntax
+    (print "=== Test 1: Basic Syntax ===")
+    (define basic-code "x = 4
+if x < 3 print(\"fuck you\")
+if x > 3 print(\"hey there\")
+unless x = ? then print(\"damn mysterious\")")
+    
+    (print "Code:")
+    (print basic-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source basic-code)
+    (print)
+    
+    ;; Test 2: Functions
+    (print "=== Test 2: Functions ===")
+    (define function-code "def square(x)
+    return x * x
+
+def cube(x)
+    return x * x * x
+
+def power(x, n)
+    if n = 0
+        return 1
+    return x * power(x, n - 1)
+
+x = 5
+y = square(x)
+z = cube(x)
+w = power(x, 3)
+print(\"x =\", x)
+print(\"square(x) =\", y)
+print(\"cube(x) =\", z)
+print(\"power(x, 3) =\", w)")
+    
+    (print "Code:")
+    (print function-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source function-code)
+    (print)
+    
+    ;; Test 3: Classes
+    (print "=== Test 3: Classes ===")
+    (define class-code "class Calculator
+    def add(self, a, b)
+        return a + b
+    
+    def subtract(self, a, b)
+        return a - b
+    
+    def multiply(self, a, b)
+        return a * b
+    
+    def divide(self, a, b)
+        return a / b
+
+class Hacker
+    def __init__(self, name, skill_level)
+        self.name = name
+        self.skill_level = skill_level
+    
+    def hack(self, target)
+        print(self.name, \"is hacking\", target)
+        return \"PWNED\")
+    
+    def level_up(self)
+        self.skill_level = self.skill_level + 1
+        print(self.name, \"leveled up to\", self.skill_level)
+
+calc = Calculator()
+result = calc.add(10, 5)
+print(\"10 + 5 =\", result)
+
+hacker = Hacker(\"Alice\", 1)
+hacker.hack(\"target.com\")
+hacker.level_up()")
+    
+    (print "Code:")
+    (print class-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source class-code)
+    (print)
+    
+    ;; Test 4: Control flow
+    (print "=== Test 4: Control Flow ===")
+    (define control-code "def fizzbuzz(n)
+    if n % 15 = 0
+        return \"FizzBuzz\"
+    if n % 3 = 0
+        return \"Fizz\"
+    if n % 5 = 0
+        return \"Buzz\"
+    return n
+
+for i in range(1, 16)
+    result = fizzbuzz(i)
+    print(i, \"=\", result)
+
+def is_prime(n)
+    if n < 2
+        return false
+    for i in range(2, n)
+        if n % i = 0
+            return false
+    return true
+
+print(\"Prime numbers from 1 to 20:\")
+for i in range(1, 21)
+    if is_prime(i)
+        print(i, \"is prime\")")
+    
+    (print "Code:")
+    (print control-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source control-code)
+    (print)
+    
+    ;; Test 5: Modules (stackit)
+    (print "=== Test 5: Modules (stackit) ===")
+    (define module-code "stackit math
+stackit os
+stackit sys
+
+x = 3.14159
+y = sin(x)
+z = cos(x)
+print(\"sin(pi) =\", y)
+print(\"cos(pi) =\", z)
+
+def fibonacci(n)
+    if n <= 1
+        return n
+    return fibonacci(n - 1) + fibonacci(n - 2)
+
+print(\"Fibonacci sequence:\")
+for i in range(10)
+    fib = fibonacci(i)
+    print(\"fib(\", i, \") =\", fib)")
+    
+    (print "Code:")
+    (print module-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source module-code)
+    (print)
+    
+    ;; Test 6: Hacker tools
+    (print "=== Test 6: Hacker Tools ===")
+    (define hacker-code "class Exploit
+    def __init__(self, name, target_type)
+        self.name = name
+        self.target_type = target_type
+        self.success_rate = 0.0
+    
+    def execute(self, target)
+        print(\"Executing\", self.name, \"on\", target)
+        if self.target_type = \"buffer_overflow\"
+            return \"Buffer overflow successful\"
+        if self.target_type = \"sql_injection\"
+            return \"SQL injection successful\"
+        if self.target_type = \"xss\"
+            return \"XSS attack successful\"
+        return \"Exploit failed\")
+    
+    def improve(self)
+        self.success_rate = self.success_rate + 0.1
+        print(\"Exploit improved. Success rate:\", self.success_rate)
+
+class PenetrationTester
+    def __init__(self, name)
+        self.name = name
+        self.exploits = list()
+    
+    def add_exploit(self, exploit)
+        self.exploits.append(exploit)
+        print(\"Added exploit:\", exploit.name)
+    
+    def test_target(self, target)
+        print(self.name, \"testing target:\", target)
+        for exploit in self.exploits
+            result = exploit.execute(target)
+            print(\"Result:\", result)
+
+# Create exploits
+exploit1 = Exploit(\"Buffer Overflow\", \"buffer_overflow\")
+exploit2 = Exploit(\"SQL Injection\", \"sql_injection\")
+exploit3 = Exploit(\"XSS Attack\", \"xss\")
+
+# Create penetration tester
+tester = PenetrationTester(\"Alice\")
+tester.add_exploit(exploit1)
+tester.add_exploit(exploit2)
+tester.add_exploit(exploit3)
+
+# Test targets
+tester.test_target(\"192.168.1.1\")
+tester.test_target(\"target.com\")
+tester.test_target(\"vulnerable-app.com\")")
+    
+    (print "Code:")
+    (print hacker-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source hacker-code)
+    (print)
+    
+    ;; Test 7: Advanced features
+    (print "=== Test 7: Advanced Features ===")
+    (define advanced-code "def quicksort(arr)
+    if len(arr) <= 1
+        return arr
+    
+    pivot = arr[0]
+    left = list()
+    right = list()
+    
+    for i in range(1, len(arr))
+        if arr[i] < pivot
+            left.append(arr[i])
+        else
+            right.append(arr[i])
+    
+    return quicksort(left) + list(pivot) + quicksort(right)
+
+def binary_search(arr, target)
+    left = 0
+    right = len(arr) - 1
+    
+    while left <= right
+        mid = (left + right) / 2
+        if arr[mid] = target
+            return mid
+        if arr[mid] < target
+            left = mid + 1
+        else
+            right = mid - 1
+    
+    return -1
+
+# Test sorting and searching
+numbers = list(64, 34, 25, 12, 22, 11, 90)
+print(\"Original array:\", numbers)
+
+sorted_numbers = quicksort(numbers)
+print(\"Sorted array:\", sorted_numbers)
+
+target = 25
+index = binary_search(sorted_numbers, target)
+if index >= 0
+    print(\"Found\", target, \"at index\", index)
+else
+    print(target, \"not found\")")
+    
+    (print "Code:")
+    (print advanced-code)
+    (print)
+    (print "Output:")
+    (funcall interpreter :execute-source advanced-code)
+    (print)
+    
+    (print "=========================================")
+    (print "DILIGAF Python-like Syntax Demo Complete!")
+    (print "=========================================")
+    (print)
+    (print "DILIGAF now has clean, Python-like syntax!")
+    (print "No more parentheses hell - just clean, readable code!")
+    (print)
+    (print "Features demonstrated:")
+    (print "  ✓ Indentation-based syntax")
+    (print "  ✓ Classes with methods")
+    (print "  ✓ Functions with def")
+    (print "  ✓ Module imports with stackit")
+    (print "  ✓ Clean control flow")
+    (print "  ✓ Hacker-friendly syntax")
+    (print)
+    (print "DILIGAF is now the ultimate hacker language!")
+    (print "Clean syntax, powerful features, maximum control!")))
+
+;; Run the demo
+(main)

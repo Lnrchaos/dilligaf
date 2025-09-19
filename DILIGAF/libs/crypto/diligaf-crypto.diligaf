@@ -1,0 +1,696 @@
+;; DILIGAF Cryptography Library
+;; Encryption, hashing, digital signatures, and cryptographic tools
+
+stackit hashlib
+stackit hmac
+stackit secrets
+stackit base64
+stackit binascii
+stackit struct
+stackit random
+stackit time
+
+;; =============================================================================
+;; DILIGAF CRYPTOGRAPHY LIBRARY
+;; =============================================================================
+
+class DiligafCrypto
+    def __init__(self)
+        self.algorithms = {
+            "hash": ["md5", "sha1", "sha224", "sha256", "sha384", "sha512", "blake2b", "blake2s"],
+            "symmetric": ["aes", "des", "3des", "blowfish", "rc4", "chacha20"],
+            "asymmetric": ["rsa", "dsa", "ecdsa", "ed25519"],
+            "mac": ["hmac", "cmac", "poly1305"]
+        }
+        self.key_sizes = {
+            "aes": [128, 192, 256],
+            "des": [56],
+            "3des": [112, 168],
+            "blowfish": [32, 40, 48, 56, 64, 72, 80, 88, 96, 104, 112, 120, 128],
+            "rsa": [1024, 2048, 3072, 4096],
+            "dsa": [1024, 2048, 3072],
+            "ecdsa": [256, 384, 521]
+        }
+    
+    def generate_key(self, algorithm="aes", key_size=256)
+        """Generate cryptographic key"""
+        try
+            if algorithm = "aes"
+                return secrets.token_bytes(key_size // 8)
+            elif algorithm = "des"
+                return secrets.token_bytes(8)
+            elif algorithm = "3des"
+                return secrets.token_bytes(24)
+            elif algorithm = "blowfish"
+                return secrets.token_bytes(key_size // 8)
+            elif algorithm = "rc4"
+                return secrets.token_bytes(16)
+            elif algorithm = "chacha20"
+                return secrets.token_bytes(32)
+            else
+                return secrets.token_bytes(32)
+        except Exception as e
+            error(f"Key generation error: {e}")
+            return None
+    
+    def generate_iv(self, size=16)
+        """Generate initialization vector"""
+        return secrets.token_bytes(size)
+    
+    def generate_nonce(self, size=12)
+        """Generate nonce"""
+        return secrets.token_bytes(size)
+    
+    def generate_salt(self, size=32)
+        """Generate salt"""
+        return secrets.token_bytes(size)
+
+;; Hash Functions
+class HashFunctions
+    def __init__(self)
+        self.supported = ["md5", "sha1", "sha224", "sha256", "sha384", "sha512", "blake2b", "blake2s"]
+    
+    def hash(self, data, algorithm="sha256")
+        """Calculate hash of data"""
+        try
+            if isinstance(data, str)
+                data = data.encode()
+            
+            if algorithm = "md5"
+                return hashlib.md5(data).hexdigest()
+            elif algorithm = "sha1"
+                return hashlib.sha1(data).hexdigest()
+            elif algorithm = "sha224"
+                return hashlib.sha224(data).hexdigest()
+            elif algorithm = "sha256"
+                return hashlib.sha256(data).hexdigest()
+            elif algorithm = "sha384"
+                return hashlib.sha384(data).hexdigest()
+            elif algorithm = "sha512"
+                return hashlib.sha512(data).hexdigest()
+            elif algorithm = "blake2b"
+                return hashlib.blake2b(data).hexdigest()
+            elif algorithm = "blake2s"
+                return hashlib.blake2s(data).hexdigest()
+            else
+                return hashlib.sha256(data).hexdigest()
+        except Exception as e
+            error(f"Hash calculation error: {e}")
+            return None
+    
+    def hash_file(self, file_path, algorithm="sha256")
+        """Calculate hash of file"""
+        try
+            hash_obj = hashlib.new(algorithm)
+            with open(file_path, "rb") as f
+                for chunk in iter(lambda: f.read(4096), b"")
+                    hash_obj.update(chunk)
+            return hash_obj.hexdigest()
+        except Exception as e
+            error(f"File hash calculation error: {e}")
+            return None
+    
+    def verify_hash(self, data, hash_value, algorithm="sha256")
+        """Verify hash of data"""
+        calculated_hash = self.hash(data, algorithm)
+        return calculated_hash = hash_value
+    
+    def verify_file_hash(self, file_path, hash_value, algorithm="sha256")
+        """Verify hash of file"""
+        calculated_hash = self.hash_file(file_path, algorithm)
+        return calculated_hash = hash_value
+
+;; Symmetric Encryption
+class SymmetricCrypto
+    def __init__(self)
+        self.supported = ["aes", "des", "3des", "blowfish", "rc4", "chacha20"]
+    
+    def encrypt_aes(self, data, key, mode="cbc", iv=None)
+        """AES encryption"""
+        try
+            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+            from cryptography.hazmat.backends import default_backend
+            
+            if isinstance(data, str)
+                data = data.encode()
+            if isinstance(key, str)
+                key = key.encode()
+            
+            if iv is None
+                iv = secrets.token_bytes(16)
+            
+            if mode = "cbc"
+                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            elif mode = "ecb"
+                cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
+            elif mode = "cfb"
+                cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+            elif mode = "ofb"
+                cipher = Cipher(algorithms.AES(key), modes.OFB(iv), backend=default_backend())
+            else
+                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            
+            encryptor = cipher.encryptor()
+            ciphertext = encryptor.update(data) + encryptor.finalize()
+            
+            return base64.b64encode(iv + ciphertext).decode()
+        except Exception as e
+            error(f"AES encryption error: {e}")
+            return None
+    
+    def decrypt_aes(self, encrypted_data, key, mode="cbc")
+        """AES decryption"""
+        try
+            from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+            from cryptography.hazmat.backends import default_backend
+            
+            if isinstance(key, str)
+                key = key.encode()
+            
+            encrypted_data = base64.b64decode(encrypted_data)
+            iv = encrypted_data[:16]
+            ciphertext = encrypted_data[16:]
+            
+            if mode = "cbc"
+                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            elif mode = "ecb"
+                cipher = Cipher(algorithms.AES(key), modes.ECB(), backend=default_backend())
+            elif mode = "cfb"
+                cipher = Cipher(algorithms.AES(key), modes.CFB(iv), backend=default_backend())
+            elif mode = "ofb"
+                cipher = Cipher(algorithms.AES(key), modes.OFB(iv), backend=default_backend())
+            else
+                cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+            
+            decryptor = cipher.decryptor()
+            plaintext = decryptor.update(ciphertext) + decryptor.finalize()
+            
+            return plaintext.decode()
+        except Exception as e
+            error(f"AES decryption error: {e}")
+            return None
+    
+    def encrypt_rc4(self, data, key)
+        """RC4 encryption"""
+        try
+            if isinstance(data, str)
+                data = data.encode()
+            if isinstance(key, str)
+                key = key.encode()
+            
+            # Simple RC4 implementation
+            s = list(range(256))
+            j = 0
+            for i in range(256)
+                j = (j + s[i] + key[i % len(key)]) % 256
+                s[i], s[j] = s[j], s[i]
+            
+            i = j = 0
+            result = bytearray()
+            for byte in data
+                i = (i + 1) % 256
+                j = (j + s[i]) % 256
+                s[i], s[j] = s[j], s[i]
+                k = s[(s[i] + s[j]) % 256]
+                result.append(byte ^ k)
+            
+            return base64.b64encode(result).decode()
+        except Exception as e
+            error(f"RC4 encryption error: {e}")
+            return None
+    
+    def decrypt_rc4(self, encrypted_data, key)
+        """RC4 decryption (same as encryption)"""
+        return self.encrypt_rc4(encrypted_data, key)
+    
+    def encrypt_xor(self, data, key)
+        """XOR encryption"""
+        try
+            if isinstance(data, str)
+                data = data.encode()
+            if isinstance(key, str)
+                key = key.encode()
+            
+            result = bytearray()
+            for i in range(len(data))
+                result.append(data[i] ^ key[i % len(key)])
+            
+            return base64.b64encode(result).decode()
+        except Exception as e
+            error(f"XOR encryption error: {e}")
+            return None
+    
+    def decrypt_xor(self, encrypted_data, key)
+        """XOR decryption (same as encryption)"""
+        return self.encrypt_xor(encrypted_data, key)
+    
+    def encrypt_caesar(self, data, shift=13)
+        """Caesar cipher encryption"""
+        try
+            result = ""
+            for char in data
+                if char.isalpha()
+                    if char.islower()
+                        result += chr((ord(char) - ord('a') + shift) % 26 + ord('a'))
+                    else
+                        result += chr((ord(char) - ord('A') + shift) % 26 + ord('A'))
+                else
+                    result += char
+            return result
+        except Exception as e
+            error(f"Caesar cipher encryption error: {e}")
+            return None
+    
+    def decrypt_caesar(self, encrypted_data, shift=13)
+        """Caesar cipher decryption"""
+        return self.encrypt_caesar(encrypted_data, -shift)
+    
+    def encrypt_rot13(self, data)
+        """ROT13 encryption"""
+        return self.encrypt_caesar(data, 13)
+    
+    def decrypt_rot13(self, encrypted_data)
+        """ROT13 decryption (same as encryption)"""
+        return self.encrypt_rot13(encrypted_data)
+
+;; Asymmetric Encryption
+class AsymmetricCrypto
+    def __init__(self)
+        self.supported = ["rsa", "dsa", "ecdsa", "ed25519"]
+    
+    def generate_rsa_keypair(self, key_size=2048)
+        """Generate RSA key pair"""
+        try
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            
+            private_key = rsa.generate_private_key(
+                public_exponent=65537,
+                key_size=key_size
+            )
+            public_key = private_key.public_key()
+            
+            private_pem = private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.PKCS8,
+                encryption_algorithm=serialization.NoEncryption()
+            )
+            
+            public_pem = public_key.public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo
+            )
+            
+            return {
+                "private_key": private_pem.decode(),
+                "public_key": public_pem.decode()
+            }
+        except Exception as e
+            error(f"RSA key pair generation error: {e}")
+            return None
+    
+    def encrypt_rsa(self, data, public_key_pem)
+        """RSA encryption"""
+        try
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            
+            if isinstance(data, str)
+                data = data.encode()
+            
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            ciphertext = public_key.encrypt(
+                data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashlib.sha256()),
+                    algorithm=hashlib.sha256(),
+                    label=None
+                )
+            )
+            
+            return base64.b64encode(ciphertext).decode()
+        except Exception as e
+            error(f"RSA encryption error: {e}")
+            return None
+    
+    def decrypt_rsa(self, encrypted_data, private_key_pem)
+        """RSA decryption"""
+        try
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            
+            private_key = serialization.load_pem_private_key(
+                private_key_pem.encode(),
+                password=None
+            )
+            
+            encrypted_data = base64.b64decode(encrypted_data)
+            plaintext = private_key.decrypt(
+                encrypted_data,
+                padding.OAEP(
+                    mgf=padding.MGF1(algorithm=hashlib.sha256()),
+                    algorithm=hashlib.sha256(),
+                    label=None
+                )
+            )
+            
+            return plaintext.decode()
+        except Exception as e
+            error(f"RSA decryption error: {e}")
+            return None
+    
+    def sign_rsa(self, data, private_key_pem)
+        """RSA digital signature"""
+        try
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.hazmat.primitives import hashes
+            
+            if isinstance(data, str)
+                data = data.encode()
+            
+            private_key = serialization.load_pem_private_key(
+                private_key_pem.encode(),
+                password=None
+            )
+            
+            signature = private_key.sign(
+                data,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            
+            return base64.b64encode(signature).decode()
+        except Exception as e
+            error(f"RSA signature error: {e}")
+            return None
+    
+    def verify_rsa(self, data, signature, public_key_pem)
+        """RSA signature verification"""
+        try
+            from cryptography.hazmat.primitives.asymmetric import rsa
+            from cryptography.hazmat.primitives import serialization
+            from cryptography.hazmat.primitives.asymmetric import padding
+            from cryptography.hazmat.primitives import hashes
+            
+            if isinstance(data, str)
+                data = data.encode()
+            
+            public_key = serialization.load_pem_public_key(public_key_pem.encode())
+            signature = base64.b64decode(signature)
+            
+            public_key.verify(
+                signature,
+                data,
+                padding.PSS(
+                    mgf=padding.MGF1(hashes.SHA256()),
+                    salt_length=padding.PSS.MAX_LENGTH
+                ),
+                hashes.SHA256()
+            )
+            
+            return True
+        except Exception as e
+            error(f"RSA signature verification error: {e}")
+            return False
+
+;; Message Authentication Codes
+class MACFunctions
+    def __init__(self)
+        self.supported = ["hmac", "cmac", "poly1305"]
+    
+    def hmac(self, data, key, algorithm="sha256")
+        """HMAC calculation"""
+        try
+            if isinstance(data, str)
+                data = data.encode()
+            if isinstance(key, str)
+                key = key.encode()
+            
+            if algorithm = "md5"
+                return hmac.new(key, data, hashlib.md5).hexdigest()
+            elif algorithm = "sha1"
+                return hmac.new(key, data, hashlib.sha1).hexdigest()
+            elif algorithm = "sha256"
+                return hmac.new(key, data, hashlib.sha256).hexdigest()
+            elif algorithm = "sha512"
+                return hmac.new(key, data, hashlib.sha512).hexdigest()
+            else
+                return hmac.new(key, data, hashlib.sha256).hexdigest()
+        except Exception as e
+            error(f"HMAC calculation error: {e}")
+            return None
+    
+    def verify_hmac(self, data, key, mac, algorithm="sha256")
+        """HMAC verification"""
+        calculated_mac = self.hmac(data, key, algorithm)
+        return calculated_mac = mac
+
+;; Password Hashing
+class PasswordHashing
+    def __init__(self)
+        self.supported = ["pbkdf2", "scrypt", "argon2", "bcrypt"]
+    
+    def hash_password(self, password, algorithm="pbkdf2", salt=None, iterations=100000)
+        """Hash password"""
+        try
+            if isinstance(password, str)
+                password = password.encode()
+            
+            if salt is None
+                salt = secrets.token_bytes(32)
+            
+            if algorithm = "pbkdf2"
+                from cryptography.hazmat.primitives import hashes
+                from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+                
+                kdf = PBKDF2HMAC(
+                    algorithm=hashes.SHA256(),
+                    length=32,
+                    salt=salt,
+                    iterations=iterations
+                )
+                key = kdf.derive(password)
+                return base64.b64encode(salt + key).decode()
+            
+            elif algorithm = "scrypt"
+                import scrypt
+                key = scrypt.hash(password, salt, N=2**14, r=8, p=1, buflen=32)
+                return base64.b64encode(salt + key).decode()
+            
+            elif algorithm = "argon2"
+                import argon2
+                key = argon2.hash_password(password, salt)
+                return key.decode()
+            
+            else
+                return self.hash_password(password, "pbkdf2", salt, iterations)
+        except Exception as e
+            error(f"Password hashing error: {e}")
+            return None
+    
+    def verify_password(self, password, hashed_password, algorithm="pbkdf2")
+        """Verify password"""
+        try
+            if isinstance(password, str)
+                password = password.encode()
+            
+            if algorithm = "pbkdf2"
+                hashed_data = base64.b64decode(hashed_password)
+                salt = hashed_data[:32]
+                stored_key = hashed_data[32:]
+                
+                kdf = PBKDF2HMAC(
+                    algorithm=hashes.SHA256(),
+                    length=32,
+                    salt=salt,
+                    iterations=100000
+                )
+                key = kdf.derive(password)
+                return key = stored_key
+            
+            elif algorithm = "argon2"
+                import argon2
+                return argon2.verify_password(hashed_password, password)
+            
+            else
+                return self.verify_password(password, hashed_password, "pbkdf2")
+        except Exception as e
+            error(f"Password verification error: {e}")
+            return False
+
+;; Steganography
+class Steganography
+    def __init__(self)
+        self.supported = ["lsb", "dct", "dwt"]
+    
+    def hide_lsb(self, image_path, message, output_path)
+        """Hide message in image using LSB steganography"""
+        try
+            from PIL import Image
+            
+            image = Image.open(image_path)
+            pixels = image.load()
+            width, height = image.size
+            
+            # Convert message to binary
+            binary_message = ''.join(format(ord(char), '08b') for char in message)
+            binary_message += '1111111111111110'  # End marker
+            
+            if len(binary_message) > width * height * 3
+                error("Message too long for image")
+                return False
+            
+            # Hide message in LSB
+            data_index = 0
+            for y in range(height)
+                for x in range(width)
+                    if data_index < len(binary_message)
+                        pixel = list(pixels[x, y])
+                        for i in range(3)  # RGB channels
+                            if data_index < len(binary_message)
+                                pixel[i] = (pixel[i] & 0xFE) | int(binary_message[data_index])
+                                data_index += 1
+                        pixels[x, y] = tuple(pixel)
+                    else
+                        break
+                if data_index >= len(binary_message)
+                    break
+            
+            image.save(output_path)
+            return True
+        except Exception as e
+            error(f"LSB steganography error: {e}")
+            return False
+    
+    def extract_lsb(self, image_path)
+        """Extract message from image using LSB steganography"""
+        try
+            from PIL import Image
+            
+            image = Image.open(image_path)
+            pixels = image.load()
+            width, height = image.size
+            
+            # Extract LSBs
+            binary_message = ""
+            for y in range(height)
+                for x in range(width)
+                    pixel = pixels[x, y]
+                    for i in range(3)  # RGB channels
+                        binary_message += str(pixel[i] & 1)
+            
+            # Convert binary to text
+            message = ""
+            for i in range(0, len(binary_message), 8)
+                byte = binary_message[i:i+8]
+                if len(byte) = 8
+                    char = chr(int(byte, 2))
+                    if char = '\x00'  # End marker
+                        return message
+                    message += char
+            
+            return message
+        except Exception as e
+            error(f"LSB extraction error: {e}")
+            return None
+
+;; Export cryptography functionality
+crypto = DiligafCrypto()
+hash_funcs = HashFunctions()
+sym_crypto = SymmetricCrypto()
+asym_crypto = AsymmetricCrypto()
+mac_funcs = MACFunctions()
+password_hash = PasswordHashing()
+stego = Steganography()
+
+;; Convenience functions
+def generate_key(algorithm="aes", key_size=256)
+    return crypto.generate_key(algorithm, key_size)
+
+def generate_iv(size=16)
+    return crypto.generate_iv(size)
+
+def generate_nonce(size=12)
+    return crypto.generate_nonce(size)
+
+def generate_salt(size=32)
+    return crypto.generate_salt(size)
+
+def hash_data(data, algorithm="sha256")
+    return hash_funcs.hash(data, algorithm)
+
+def hash_file(file_path, algorithm="sha256")
+    return hash_funcs.hash_file(file_path, algorithm)
+
+def verify_hash(data, hash_value, algorithm="sha256")
+    return hash_funcs.verify_hash(data, hash_value, algorithm)
+
+def encrypt_aes(data, key, mode="cbc", iv=None)
+    return sym_crypto.encrypt_aes(data, key, mode, iv)
+
+def decrypt_aes(encrypted_data, key, mode="cbc")
+    return sym_crypto.decrypt_aes(encrypted_data, key, mode)
+
+def encrypt_rc4(data, key)
+    return sym_crypto.encrypt_rc4(data, key)
+
+def decrypt_rc4(encrypted_data, key)
+    return sym_crypto.decrypt_rc4(encrypted_data, key)
+
+def encrypt_xor(data, key)
+    return sym_crypto.encrypt_xor(data, key)
+
+def decrypt_xor(encrypted_data, key)
+    return sym_crypto.decrypt_xor(encrypted_data, key)
+
+def encrypt_caesar(data, shift=13)
+    return sym_crypto.encrypt_caesar(data, shift)
+
+def decrypt_caesar(encrypted_data, shift=13)
+    return sym_crypto.decrypt_caesar(encrypted_data, shift)
+
+def encrypt_rot13(data)
+    return sym_crypto.encrypt_rot13(data)
+
+def decrypt_rot13(encrypted_data)
+    return sym_crypto.decrypt_rot13(encrypted_data)
+
+def generate_rsa_keypair(key_size=2048)
+    return asym_crypto.generate_rsa_keypair(key_size)
+
+def encrypt_rsa(data, public_key_pem)
+    return asym_crypto.encrypt_rsa(data, public_key_pem)
+
+def decrypt_rsa(encrypted_data, private_key_pem)
+    return asym_crypto.decrypt_rsa(encrypted_data, private_key_pem)
+
+def sign_rsa(data, private_key_pem)
+    return asym_crypto.sign_rsa(data, private_key_pem)
+
+def verify_rsa(data, signature, public_key_pem)
+    return asym_crypto.verify_rsa(data, signature, public_key_pem)
+
+def calculate_hmac(data, key, algorithm="sha256")
+    return mac_funcs.hmac(data, key, algorithm)
+
+def verify_hmac(data, key, mac, algorithm="sha256")
+    return mac_funcs.verify_hmac(data, key, mac, algorithm)
+
+def hash_password(password, algorithm="pbkdf2", salt=None, iterations=100000)
+    return password_hash.hash_password(password, algorithm, salt, iterations)
+
+def verify_password(password, hashed_password, algorithm="pbkdf2")
+    return password_hash.verify_password(password, hashed_password, algorithm)
+
+def hide_message(image_path, message, output_path)
+    return stego.hide_lsb(image_path, message, output_path)
+
+def extract_message(image_path)
+    return stego.extract_lsb(image_path)

@@ -1,0 +1,806 @@
+;; DILIGAF Main Interpreter with Python-like Syntax
+;; Clean, indentation-based syntax with classes, def, and stackit
+
+;; =============================================================================
+;; DILIGAF PYTHON-LIKE MAIN INTERPRETER
+;; =============================================================================
+
+(define diligaf-python-main
+  (lambda ()
+    (define environment (make-hash-table))
+    (define classes (make-hash-table))
+    (define modules (make-hash-table))
+    (define current-indent 0)
+    (define indent-stack (list))
+    
+    ;; Initialize built-in functions
+    (define init-builtins
+      (lambda ()
+        (set-hash-table-value environment "print" (lambda (&rest args) (apply print args)))
+        (set-hash-table-value environment "input" (lambda (prompt) (print prompt) (read-line)))
+        (set-hash-table-value environment "len" (lambda (x) (length x)))
+        (set-hash-table-value environment "type" (lambda (x) (type-of x)))
+        (set-hash-table-value environment "str" (lambda (x) (string x)))
+        (set-hash-table-value environment "int" (lambda (x) (round x)))
+        (set-hash-table-value environment "float" (lambda (x) (float x)))
+        (set-hash-table-value environment "list" (lambda (&rest args) args))
+        (set-hash-table-value environment "dict" (lambda (&rest args) (create-dict args)))
+        (set-hash-table-value environment "range" (lambda (start end) (create-range start end)))
+        (set-hash-table-value environment "enumerate" (lambda (lst) (create-enumerate lst)))
+        (set-hash-table-value environment "zip" (lambda (&rest lists) (create-zip lists)))
+        (set-hash-table-value environment "map" (lambda (func lst) (create-map func lst)))
+        (set-hash-table-value environment "filter" (lambda (func lst) (create-filter func lst)))
+        (set-hash-table-value environment "reduce" (lambda (func lst) (create-reduce func lst)))
+        (set-hash-table-value environment "sum" (lambda (lst) (apply + lst)))
+        (set-hash-table-value environment "max" (lambda (lst) (apply max lst)))
+        (set-hash-table-value environment "min" (lambda (lst) (apply min lst)))
+        (set-hash-table-value environment "abs" (lambda (x) (abs x)))
+        (set-hash-table-value environment "round" (lambda (x) (round x)))
+        (set-hash-table-value environment "pow" (lambda (x y) (expt x y)))
+        (set-hash-table-value environment "sqrt" (lambda (x) (sqrt x)))
+        (set-hash-table-value environment "sin" (lambda (x) (sin x)))
+        (set-hash-table-value environment "cos" (lambda (x) (cos x)))
+        (set-hash-table-value environment "tan" (lambda (x) (tan x)))
+        (set-hash-table-value environment "log" (lambda (x) (log x)))
+        (set-hash-table-value environment "exp" (lambda (x) (exp x)))
+        (set-hash-table-value environment "pi" 3.141592653589793)
+        (set-hash-table-value environment "e" 2.718281828459045)
+        (set-hash-table-value environment "true" true)
+        (set-hash-table-value environment "false" false)
+        (set-hash-table-value environment "nil" nil)
+        (set-hash-table-value environment "null" nil)))
+    
+    ;; Create dictionary
+    (define create-dict
+      (lambda (args)
+        (define dict (make-hash-table))
+        (dotimes (i (length args) 2)
+          (set-hash-table-value dict (nth i args) (nth (+ i 1) args)))
+        dict))
+    
+    ;; Create range
+    (define create-range
+      (lambda (start end)
+        (define result (list))
+        (dotimes (i (- end start))
+          (push result (+ start i)))
+        (reverse result)))
+    
+    ;; Create enumerate
+    (define create-enumerate
+      (lambda (lst)
+        (define result (list))
+        (dotimes (i (length lst))
+          (push result (list i (nth i lst))))
+        (reverse result)))
+    
+    ;; Create zip
+    (define create-zip
+      (lambda (lists)
+        (define result (list))
+        (define min-length (apply min (map length lists)))
+        (dotimes (i min-length)
+          (define row (list))
+          (dolist (lst lists)
+            (push row (nth i lst)))
+          (push result (reverse row)))
+        (reverse result)))
+    
+    ;; Create map
+    (define create-map
+      (lambda (func lst)
+        (map func lst)))
+    
+    ;; Create filter
+    (define create-filter
+      (lambda (func lst)
+        (remove-if (lambda (x) (not (funcall func x))) lst)))
+    
+    ;; Create reduce
+    (define create-reduce
+      (lambda (func lst)
+        (if (null? lst)
+            nil
+            (reduce func (cdr lst) (car lst)))))
+    
+    ;; Parse DILIGAF source with Python-like syntax
+    (define parse-source
+      (lambda (source)
+        (define lines (split-lines source))
+        (define statements (list))
+        (define current-block (list))
+        (define indent-level 0)
+        (define prev-indent 0)
+        
+        (dolist (line lines)
+          (define trimmed (string-trim line))
+          (if (not (string= trimmed ""))
+              (progn
+                (define current-indent (calculate-indent line))
+                (define statement (parse-line trimmed))
+                
+                (if (> current-indent prev-indent)
+                    (progn
+                      (push statements (list :block current-block))
+                      (set! current-block (list statement))
+                      (set! prev-indent current-indent))
+                    (if (< current-indent prev-indent)
+                        (progn
+                          (push statements (list :block current-block))
+                          (set! current-block (list statement))
+                          (set! prev-indent current-indent))
+                        (push current-block statement))))))
+        
+        (if (not (null? current-block))
+            (push statements (list :block current-block)))
+        
+        (reverse statements)))
+    
+    ;; Calculate indentation level
+    (define calculate-indent
+      (lambda (line)
+        (define indent 0)
+        (dotimes (i (length line))
+          (let ((char (char-at line i)))
+            (if (char= char #\Space)
+                (set! indent (+ indent 1))
+                (if (char= char #\Tab)
+                    (set! indent (+ indent 4))
+                    (break)))))
+        indent))
+    
+    ;; Parse a single line
+    (define parse-line
+      (lambda (line)
+        (define tokens (tokenize-line line))
+        (parse-tokens tokens)))
+    
+    ;; Tokenize a line
+    (define tokenize-line
+      (lambda (line)
+        (define tokens (list))
+        (define pos 0)
+        (define len (length line))
+        
+        (while (< pos len)
+          (let ((char (char-at line pos)))
+            (cond
+              ((char-whitespace? char)
+               (set! pos (+ pos 1)))
+              ((char= char #\#)
+               (break))  ; Comment
+              ((char= char #\")
+               (let ((string-token (parse-string line pos)))
+                 (push tokens (car string-token))
+                 (set! pos (cadr string-token))))
+              ((char-digit? char)
+               (let ((number-token (parse-number line pos)))
+                 (push tokens (car number-token))
+                 (set! pos (cadr number-token))))
+              ((char-alpha? char)
+               (let ((identifier-token (parse-identifier line pos)))
+                 (push tokens (car identifier-token))
+                 (set! pos (cadr identifier-token))))
+              ((char-operator? char)
+               (let ((operator-token (parse-operator line pos)))
+                 (push tokens (car operator-token))
+                 (set! pos (cadr identifier-token))))
+              (else
+               (set! pos (+ pos 1)))))
+        tokens))
+    
+    ;; Parse string literal
+    (define parse-string
+      (lambda (line pos)
+        (define start pos)
+        (set! pos (+ pos 1))  ; Skip opening quote
+        (while (and (< pos (length line)) (not (char= (char-at line pos) #\")))
+          (set! pos (+ pos 1)))
+        (if (< pos (length line))
+            (set! pos (+ pos 1)))  ; Skip closing quote
+        (list (list :string (substring line (+ start 1) (- pos 1))) pos)))
+    
+    ;; Parse number
+    (define parse-number
+      (lambda (line pos)
+        (define start pos)
+        (while (and (< pos (length line)) (char-digit? (char-at line pos)))
+          (set! pos (+ pos 1)))
+        (if (and (< pos (length line)) (char= (char-at line pos) #\.))
+            (progn
+              (set! pos (+ pos 1))
+              (while (and (< pos (length line)) (char-digit? (char-at line pos)))
+                (set! pos (+ pos 1)))))
+        (list (list :number (substring line start pos)) pos)))
+    
+    ;; Parse identifier or keyword
+    (define parse-identifier
+      (lambda (line pos)
+        (define start pos)
+        (while (and (< pos (length line)) (or (char-alphanumeric? (char-at line pos)) (char= (char-at line pos) #\_)))
+          (set! pos (+ pos 1)))
+        (define value (substring line start pos))
+        (define type (if (member value (list "if" "unless" "while" "for" "def" "class" "stackit" "return" "break" "continue" "true" "false" "nil" "null")) :keyword :identifier))
+        (list (list type value) pos)))
+    
+    ;; Parse operator
+    (define parse-operator
+      (lambda (line pos)
+        (define start pos)
+        (define char (char-at line pos))
+        
+        ;; Check for multi-character operators
+        (if (and (< (+ pos 1) (length line))
+                 (or (and (char= char #\=) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\!) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\<) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\>) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\&) (char= (char-at line (+ pos 1)) #\&))
+                     (and (char= char #\|) (char= (char-at line (+ pos 1)) #\|))))
+            (set! pos (+ pos 2))
+            (set! pos (+ pos 1)))
+        
+        (list (list :operator (substring line start pos)) pos)))
+    
+    ;; Parse tokens into AST
+    (define parse-tokens
+      (lambda (tokens)
+        (if (null? tokens)
+            nil
+            (let ((token (car tokens)))
+              (case (car token)
+                (:keyword
+                 (case (cadr token)
+                   ("if" (parse-if-statement (cdr tokens)))
+                   ("unless" (parse-unless-statement (cdr tokens)))
+                   ("while" (parse-while-statement (cdr tokens)))
+                   ("for" (parse-for-statement (cdr tokens)))
+                   ("def" (parse-def-statement (cdr tokens)))
+                   ("class" (parse-class-statement (cdr tokens)))
+                   ("stackit" (parse-stackit-statement (cdr tokens)))
+                   ("return" (parse-return-statement (cdr tokens)))
+                   ("break" (list :break))
+                   ("continue" (list :continue))
+                   (else (parse-expression tokens))))
+                (:identifier
+                 (if (and (not (null? (cdr tokens)))
+                          (eq (caadr tokens) :operator)
+                          (string= (cadadr tokens) "="))
+                     (parse-assignment tokens)
+                     (parse-expression tokens)))
+                (else (parse-expression tokens))))))
+    
+    ;; Parse if statement
+    (define parse-if-statement
+      (lambda (tokens)
+        (define condition (parse-expression tokens))
+        (define remaining (skip-expression tokens))
+        (list :if condition (list :block (list)))))
+    
+    ;; Parse unless statement
+    (define parse-unless-statement
+      (lambda (tokens)
+        (define condition (parse-expression tokens))
+        (define remaining (skip-expression tokens))
+        (list :unless condition (list :block (list)))))
+    
+    ;; Parse while statement
+    (define parse-while-statement
+      (lambda (tokens)
+        (define condition (parse-expression tokens))
+        (define remaining (skip-expression tokens))
+        (list :while condition (list :block (list)))))
+    
+    ;; Parse for statement
+    (define parse-for-statement
+      (lambda (tokens)
+        (define variable (cadr (car tokens)))
+        (define remaining (cdr tokens))
+        (if (and (not (null? remaining))
+                 (eq (caar remaining) :keyword)
+                 (string= (cadar remaining) "in"))
+            (progn
+              (set! remaining (cdr remaining))
+              (define iterable (parse-expression remaining))
+              (list :for variable iterable (list :block (list))))
+            (error "Expected 'in' in for statement"))))
+    
+    ;; Parse def statement
+    (define parse-def-statement
+      (lambda (tokens)
+        (define name (cadr (car tokens)))
+        (define remaining (cdr tokens))
+        (define params (parse-parameter-list remaining))
+        (list :def name params (list :block (list)))))
+    
+    ;; Parse class statement
+    (define parse-class-statement
+      (lambda (tokens)
+        (define name (cadr (car tokens)))
+        (list :class name (list :block (list)))))
+    
+    ;; Parse stackit statement
+    (define parse-stackit-statement
+      (lambda (tokens)
+        (define module (cadr (car tokens)))
+        (list :stackit module)))
+    
+    ;; Parse return statement
+    (define parse-return-statement
+      (lambda (tokens)
+        (if (null? tokens)
+            (list :return nil)
+            (list :return (parse-expression tokens)))))
+    
+    ;; Parse assignment
+    (define parse-assignment
+      (lambda (tokens)
+        (define variable (cadr (car tokens)))
+        (define remaining (cdr tokens))
+        (if (and (not (null? remaining))
+                 (eq (caar remaining) :operator)
+                 (string= (cadar remaining) "="))
+            (progn
+              (set! remaining (cdr remaining))
+              (define value (parse-expression remaining))
+              (list :assign variable value))
+            (error "Expected '=' in assignment"))))
+    
+    ;; Parse expression
+    (define parse-expression
+      (lambda (tokens)
+        (parse-logical-or tokens)))
+    
+    ;; Parse logical OR
+    (define parse-logical-or
+      (lambda (tokens)
+        (define left (parse-logical-and tokens))
+        (define remaining (cdr left))
+        (set! left (car left))
+        
+        (while (and (not (null? remaining))
+                    (eq (caar remaining) :operator)
+                    (string= (cadar remaining) "or"))
+          (set! remaining (cdr remaining))
+          (define right (parse-logical-and remaining))
+          (set! remaining (cdr right))
+          (set! left (list :or left (car right))))
+        
+        (list left remaining)))
+    
+    ;; Parse logical AND
+    (define parse-logical-and
+      (lambda (tokens)
+        (define left (parse-equality tokens))
+        (define remaining (cdr left))
+        (set! left (car left))
+        
+        (while (and (not (null? remaining))
+                    (eq (caar remaining) :operator)
+                    (string= (cadar remaining) "and"))
+          (set! remaining (cdr remaining))
+          (define right (parse-equality remaining))
+          (set! remaining (cdr right))
+          (set! left (list :and left (car right))))
+        
+        (list left remaining)))
+    
+    ;; Parse equality
+    (define parse-equality
+      (lambda (tokens)
+        (define left (parse-comparison tokens))
+        (define remaining (cdr left))
+        (set! left (car left))
+        
+        (while (and (not (null? remaining))
+                    (eq (caar remaining) :operator)
+                    (member (cadar remaining) (list "==" "!=")))
+          (define op (cadar remaining))
+          (set! remaining (cdr remaining))
+          (define right (parse-comparison remaining))
+          (set! remaining (cdr right))
+          (set! left (list (if (string= op "==") :eq :ne) left (car right))))
+        
+        (list left remaining)))
+    
+    ;; Parse comparison
+    (define parse-comparison
+      (lambda (tokens)
+        (define left (parse-addition tokens))
+        (define remaining (cdr left))
+        (set! left (car left))
+        
+        (while (and (not (null? remaining))
+                    (eq (caar remaining) :operator)
+                    (member (cadar remaining) (list "<" ">" "<=" ">=")))
+          (define op (cadar remaining))
+          (set! remaining (cdr remaining))
+          (define right (parse-addition remaining))
+          (set! remaining (cdr right))
+          (set! left (list (case op
+                             ("<" :lt)
+                             (">" :gt)
+                             ("<=" :le)
+                             (">=" :ge)) left (car right))))
+        
+        (list left remaining)))
+    
+    ;; Parse addition
+    (define parse-addition
+      (lambda (tokens)
+        (define left (parse-multiplication tokens))
+        (define remaining (cdr left))
+        (set! left (car left))
+        
+        (while (and (not (null? remaining))
+                    (eq (caar remaining) :operator)
+                    (member (cadar remaining) (list "+" "-")))
+          (define op (cadar remaining))
+          (set! remaining (cdr remaining))
+          (define right (parse-multiplication remaining))
+          (set! remaining (cdr right))
+          (set! left (list (if (string= op "+") :add :sub) left (car right))))
+        
+        (list left remaining)))
+    
+    ;; Parse multiplication
+    (define parse-multiplication
+      (lambda (tokens)
+        (define left (parse-primary tokens))
+        (define remaining (cdr left))
+        (set! left (car left))
+        
+        (while (and (not (null? remaining))
+                    (eq (caar remaining) :operator)
+                    (member (cadar remaining) (list "*" "/" "%")))
+          (define op (cadar remaining))
+          (set! remaining (cdr remaining))
+          (define right (parse-primary remaining))
+          (set! remaining (cdr right))
+          (set! left (list (case op
+                             ("*" :mul)
+                             ("/" :div)
+                             ("%" :mod)) left (car right))))
+        
+        (list left remaining)))
+    
+    ;; Parse primary expression
+    (define parse-primary
+      (lambda (tokens)
+        (if (null? tokens)
+            (list nil tokens)
+            (let ((token (car tokens)))
+              (case (car token)
+                (:number (list (string-to-number (cadr token)) (cdr tokens)))
+                (:string (list (cadr token) (cdr tokens)))
+                (:identifier (list (cadr token) (cdr tokens)))
+                (:keyword
+                 (case (cadr token)
+                   ("true" (list true (cdr tokens)))
+                   ("false" (list false (cdr tokens)))
+                   ("nil" (list nil (cdr tokens)))
+                   ("null" (list nil (cdr tokens)))
+                   (else (list (cadr token) (cdr tokens)))))
+                (else (list (cadr token) (cdr tokens))))))))
+    
+    ;; Parse parameter list
+    (define parse-parameter-list
+      (lambda (tokens)
+        (define params (list))
+        (while (and (not (null? tokens))
+                    (not (eq (caar tokens) :operator)))
+          (if (eq (caar tokens) :identifier)
+              (progn
+                (push params (cadar tokens))
+                (set! tokens (cdr tokens))
+                (if (and (not (null? tokens))
+                         (eq (caar tokens) :operator)
+                         (string= (cadar tokens) ","))
+                    (set! tokens (cdr tokens)))))
+          (set! tokens (cdr tokens)))
+        (reverse params)))
+    
+    ;; Skip expression
+    (define skip-expression
+      (lambda (tokens)
+        (define depth 0)
+        (while (and (not (null? tokens))
+                    (or (> depth 0)
+                        (not (eq (caar tokens) :operator))))
+          (if (eq (caar tokens) :operator)
+              (case (cadar tokens)
+                ("(" (set! depth (+ depth 1)))
+                (")" (set! depth (- depth 1)))
+              (set! tokens (cdr tokens))))
+        tokens))
+    
+    ;; Execute DILIGAF source
+    (define execute-source
+      (lambda (source)
+        (define ast (parse-source source))
+        (execute-statements ast)))
+    
+    ;; Execute statements
+    (define execute-statements
+      (lambda (statements)
+        (define result nil)
+        (dolist (statement statements)
+          (set! result (execute-statement statement)))
+        result))
+    
+    ;; Execute single statement
+    (define execute-statement
+      (lambda (statement)
+        (case (car statement)
+          (:if (execute-if statement))
+          (:unless (execute-unless statement))
+          (:while (execute-while statement))
+          (:for (execute-for statement))
+          (:def (execute-def statement))
+          (:class (execute-class statement))
+          (:stackit (execute-stackit statement))
+          (:return (execute-return statement))
+          (:assign (execute-assign statement))
+          (:break (execute-break statement))
+          (:continue (execute-continue statement))
+          (:block (execute-block statement))
+          (else (execute-expression statement)))))
+    
+    ;; Execute if statement
+    (define execute-if
+      (lambda (statement)
+        (define condition (execute-expression (cadr statement)))
+        (if condition
+            (execute-statements (caddr statement))
+            nil)))
+    
+    ;; Execute unless statement
+    (define execute-unless
+      (lambda (statement)
+        (define condition (execute-expression (cadr statement)))
+        (if (not condition)
+            (execute-statements (caddr statement))
+            nil)))
+    
+    ;; Execute while statement
+    (define execute-while
+      (lambda (statement)
+        (define condition (cadr statement))
+        (define body (caddr statement))
+        (while (execute-expression condition)
+          (execute-statements body))))
+    
+    ;; Execute for statement
+    (define execute-for
+      (lambda (statement)
+        (define variable (cadr statement))
+        (define iterable (execute-expression (caddr statement)))
+        (define body (cadddr statement))
+        (dolist (item iterable)
+          (set-hash-table-value environment variable item)
+          (execute-statements body))))
+    
+    ;; Execute def statement
+    (define execute-def
+      (lambda (statement)
+        (define name (cadr statement))
+        (define params (caddr statement))
+        (define body (cadddr statement))
+        (define function (lambda (&rest args)
+                           (let ((old-env (copy-hash-table environment)))
+                             (dotimes (i (length params))
+                               (set-hash-table-value environment (nth i params) (nth i args)))
+                             (execute-statements body))))
+        (set-hash-table-value environment name function)))
+    
+    ;; Execute class statement
+    (define execute-class
+      (lambda (statement)
+        (define name (cadr statement))
+        (define body (caddr statement))
+        (define class-def (list :name name :body body))
+        (set-hash-table-value classes name class-def)))
+    
+    ;; Execute stackit statement
+    (define execute-stackit
+      (lambda (statement)
+        (define module (cadr statement))
+        (load-module module)))
+    
+    ;; Execute return statement
+    (define execute-return
+      (lambda (statement)
+        (execute-expression (cadr statement))))
+    
+    ;; Execute assignment
+    (define execute-assign
+      (lambda (statement)
+        (define variable (cadr statement))
+        (define value (execute-expression (caddr statement)))
+        (set-hash-table-value environment variable value)))
+    
+    ;; Execute break statement
+    (define execute-break
+      (lambda (statement)
+        (list :break)))
+    
+    ;; Execute continue statement
+    (define execute-continue
+      (lambda (statement)
+        (list :continue)))
+    
+    ;; Execute block
+    (define execute-block
+      (lambda (statement)
+        (execute-statements (cadr statement))))
+    
+    ;; Execute expression
+    (define execute-expression
+      (lambda (expr)
+        (cond
+          ((atom? expr) 
+           (if (symbol? expr)
+               (get-hash-table-value environment expr)
+               expr))
+          ((list? expr)
+           (case (car expr)
+             (:add (+ (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:sub (- (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:mul (* (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:div (/ (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:mod (mod (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:eq (= (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:ne (not (= (execute-expression (cadr expr)) (execute-expression (caddr expr)))))
+             (:lt (< (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:gt (> (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:le (<= (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:ge (>= (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:and (and (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:or (or (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (else (execute-function-call expr))))
+          (else expr))))
+    
+    ;; Execute function call
+    (define execute-function-call
+      (lambda (expr)
+        (define func-name (car expr))
+        (define args (map execute-expression (cdr expr)))
+        (define func (get-hash-table-value environment func-name))
+        (if func
+            (apply func args)
+            (error "Undefined function:" func-name))))
+    
+    ;; Load module
+    (define load-module
+      (lambda (module-name)
+        (define module-path (string-append module-name ".diligaf"))
+        (if (probe-file module-path)
+            (progn
+              (define module-source (read-file module-path))
+              (execute-source module-source))
+            (error "Module not found:" module-name))))
+    
+    ;; Utility functions
+    (define copy-hash-table
+      (lambda (ht)
+        (define new-ht (make-hash-table))
+        (maphash (lambda (k v) (set-hash-table-value new-ht k v)) ht)
+        new-ht))
+    
+    (define type-of
+      (lambda (x)
+        (cond
+          ((number? x) "number")
+          ((string? x) "string")
+          ((list? x) "list")
+          ((function? x) "function")
+          (else "unknown"))))
+    
+    ;; String utilities
+    (define string-trim
+      (lambda (str)
+        (define start 0)
+        (define end (length str))
+        (while (and (< start end) (char-whitespace? (char-at str start)))
+          (set! start (+ start 1)))
+        (while (and (> end start) (char-whitespace? (char-at str (- end 1))))
+          (set! end (- end 1)))
+        (substring str start end)))
+    
+    (define split-lines
+      (lambda (str)
+        (define lines (list))
+        (define current-line "")
+        (dotimes (i (length str))
+          (let ((char (char-at str i)))
+            (if (char= char #\Newline)
+                (progn
+                  (push lines current-line)
+                  (set! current-line ""))
+                (set! current-line (string-append current-line (string char))))))
+        (if (not (string= current-line ""))
+            (push lines current-line))
+        (reverse lines)))
+    
+    (define substring
+      (lambda (str start end)
+        (define result "")
+        (dotimes (i (- end start))
+          (set! result (string-append result (string (char-at str (+ start i))))))
+        result))
+    
+    (define char-at
+      (lambda (str index)
+        (if (< index (length str))
+            (string-ref str index)
+            #\Null)))
+    
+    (define string-append
+      (lambda (str1 str2)
+        (concatenate 'string str1 str2)))
+    
+    (define string-to-number
+      (lambda (str)
+        (read-from-string str)))
+    
+    ;; Character utilities
+    (define char-whitespace?
+      (lambda (char)
+        (or (char= char #\Space) (char= char #\Tab))))
+    
+    (define char-digit?
+      (lambda (char)
+        (and (char>= char #\0) (char<= char #\9))))
+    
+    (define char-alpha?
+      (lambda (char)
+        (or (and (char>= char #\a) (char<= char #\z))
+            (and (char>= char #\A) (char<= char #\Z)))))
+    
+    (define char-alphanumeric?
+      (lambda (char)
+        (or (char-digit? char) (char-alpha? char))))
+    
+    (define char-operator?
+      (lambda (char)
+        (member char (list #\= #\+ #\- #\* #\/ #\% #\< #\> #\! #\& #\|))))
+    
+    ;; Initialize interpreter
+    (init-builtins)
+    
+    ;; Return interpreter
+    (list :execute-source execute-source
+          :environment environment
+          :classes classes
+          :modules modules)))
+
+;; =============================================================================
+;; DILIGAF PYTHON-LIKE SYNTAX TEST
+;; =============================================================================
+
+(define test-python-syntax
+  (lambda ()
+    (print "DILIGAF Python-like Syntax Test")
+    (print "===============================")
+    (print)
+    
+    (define interpreter (diligaf-python-main))
+    
+    ;; Test basic syntax
+    (define test-code "x = 4
+if x < 3 print(\"fuck you\")
+if x > 3 print(\"hey there\")
+unless x = ? then print(\"damn mysterious\")")
+    
+    (print "Testing Python-like syntax:")
+    (print test-code)
+    (print)
+    
+    (print "Executing...")
+    (funcall interpreter :execute-source test-code)
+    (print)
+    
+    (print "DILIGAF Python-like syntax is working!")))
+
+;; Run test
+(test-python-syntax)

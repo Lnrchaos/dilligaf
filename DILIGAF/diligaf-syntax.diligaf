@@ -1,0 +1,733 @@
+;; DILIGAF New Syntax Parser
+;; Indentation-based syntax with classes, def, and stackit
+
+;; =============================================================================
+;; DILIGAF INDENTATION-BASED SYNTAX PARSER
+;; =============================================================================
+
+(define diligaf-syntax-parser
+  (lambda ()
+    (define current-indent 0)
+    (define indent-stack (list))
+    (define line-number 0)
+    (define tokens (list))
+    
+    ;; Token types
+    (define token-types
+      (list :keyword :identifier :number :string :operator :newline :indent :dedent :eof))
+    
+    ;; Keywords
+    (define keywords
+      (list "if" "unless" "while" "for" "def" "class" "stackit" "return" "break" "continue" "true" "false" "nil"))
+    
+    ;; Operators
+    (define operators
+      (list "=" "+" "-" "*" "/" "%" "==" "!=" "<" ">" "<=" ">=" "and" "or" "not" "in" "is"))
+    
+    ;; Parse DILIGAF source with new syntax
+    (define parse-source
+      (lambda (source)
+        (set! tokens (tokenize-indentation source))
+        (set! line-number 0)
+        (set! current-indent 0)
+        (set! indent-stack (list))
+        (parse-statements)))
+    
+    ;; Tokenize with indentation handling
+    (define tokenize-indentation
+      (lambda (source)
+        (define lines (split-lines source))
+        (define all-tokens (list))
+        (define prev-indent 0)
+        
+        (dolist (line lines)
+          (set! line-number (+ line-number 1))
+          (define trimmed (string-trim line))
+          
+          (if (not (string= trimmed ""))
+              (progn
+                (define indent-level (calculate-indent line))
+                (define line-tokens (tokenize-line trimmed))
+                
+                ;; Handle indentation changes
+                (if (> indent-level prev-indent)
+                    (progn
+                      (push all-tokens (list :indent indent-level line-number))
+                      (set! prev-indent indent-level))
+                    (if (< indent-level prev-indent)
+                        (progn
+                          (push all-tokens (list :dedent indent-level line-number))
+                          (set! prev-indent indent-level))))
+                
+                ;; Add line tokens
+                (dolist (token line-tokens)
+                  (push all-tokens token))
+                
+                ;; Add newline
+                (push all-tokens (list :newline line-number))))
+        
+        (push all-tokens (list :eof line-number))
+        (reverse all-tokens)))
+    
+    ;; Calculate indentation level
+    (define calculate-indent
+      (lambda (line)
+        (define indent 0)
+        (dotimes (i (length line))
+          (let ((char (char-at line i)))
+            (if (char= char #\Space)
+                (set! indent (+ indent 1))
+                (if (char= char #\Tab)
+                    (set! indent (+ indent 4))
+                    (break)))))
+        indent))
+    
+    ;; Tokenize a single line
+    (define tokenize-line
+      (lambda (line)
+        (define tokens (list))
+        (define pos 0)
+        (define len (length line))
+        
+        (while (< pos len)
+          (let ((char (char-at line pos)))
+            (cond
+              ((char-whitespace? char)
+               (set! pos (+ pos 1)))
+              ((char= char #\#)
+               (break))  ; Comment, skip rest of line
+              ((char= char #\")
+               (let ((string-token (parse-string line pos)))
+                 (push tokens (car string-token))
+                 (set! pos (cadr string-token))))
+              ((char-digit? char)
+               (let ((number-token (parse-number line pos)))
+                 (push tokens (car number-token))
+                 (set! pos (cadr number-token))))
+              ((char-alpha? char)
+               (let ((identifier-token (parse-identifier line pos)))
+                 (push tokens (car identifier-token))
+                 (set! pos (cadr identifier-token))))
+              ((char-operator? char)
+               (let ((operator-token (parse-operator line pos)))
+                 (push tokens (car operator-token))
+                 (set! pos (cadr operator-token))))
+              (else
+               (set! pos (+ pos 1)))))
+        tokens))
+    
+    ;; Parse string literal
+    (define parse-string
+      (lambda (line pos)
+        (define start pos)
+        (set! pos (+ pos 1))  ; Skip opening quote
+        (while (and (< pos (length line)) (not (char= (char-at line pos) #\")))
+          (set! pos (+ pos 1)))
+        (if (< pos (length line))
+            (set! pos (+ pos 1)))  ; Skip closing quote
+        (list (list :string (substring line (+ start 1) (- pos 1)) line-number) pos)))
+    
+    ;; Parse number
+    (define parse-number
+      (lambda (line pos)
+        (define start pos)
+        (while (and (< pos (length line)) (char-digit? (char-at line pos)))
+          (set! pos (+ pos 1)))
+        (if (and (< pos (length line)) (char= (char-at line pos) #\.))
+            (progn
+              (set! pos (+ pos 1))
+              (while (and (< pos (length line)) (char-digit? (char-at line pos)))
+                (set! pos (+ pos 1)))))
+        (list (list :number (substring line start pos) line-number) pos)))
+    
+    ;; Parse identifier or keyword
+    (define parse-identifier
+      (lambda (line pos)
+        (define start pos)
+        (while (and (< pos (length line)) (or (char-alphanumeric? (char-at line pos)) (char= (char-at line pos) #\_)))
+          (set! pos (+ pos 1)))
+        (define value (substring line start pos))
+        (define type (if (member value keywords) :keyword :identifier))
+        (list (list type value line-number) pos)))
+    
+    ;; Parse operator
+    (define parse-operator
+      (lambda (line pos)
+        (define start pos)
+        (define char (char-at line pos))
+        
+        ;; Check for multi-character operators
+        (if (and (< (+ pos 1) (length line))
+                 (or (and (char= char #\=) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\!) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\<) (char= (char-at line (+ pos 1)) #\=))
+                     (and (char= char #\>) (char= (char-at line (+ pos 1)) #\=))))
+            (set! pos (+ pos 2))
+            (set! pos (+ pos 1)))
+        
+        (list (list :operator (substring line start pos) line-number) pos)))
+    
+    ;; Parse statements
+    (define parse-statements
+      (lambda ()
+        (define statements (list))
+        (while (not (eq (get-current-token-type) :eof))
+          (let ((statement (parse-statement)))
+            (if statement
+                (push statements statement))))
+        (reverse statements)))
+    
+    ;; Parse single statement
+    (define parse-statement
+      (lambda ()
+        (let ((token (get-current-token)))
+          (case (get-token-type token)
+            (:keyword
+             (case (get-token-value token)
+               ("if" (parse-if-statement))
+               ("unless" (parse-unless-statement))
+               ("while" (parse-while-statement))
+               ("for" (parse-for-statement))
+               ("def" (parse-def-statement))
+               ("class" (parse-class-statement))
+               ("stackit" (parse-stackit-statement))
+               ("return" (parse-return-statement))
+               (else (parse-expression-statement))))
+            (:identifier (parse-assignment-statement))
+            (:indent (parse-indented-block))
+            (:dedent (parse-dedent))
+            (:newline (progn (next-token) (parse-statement)))
+            (else (parse-expression-statement)))))
+    
+    ;; Parse if statement
+    (define parse-if-statement
+      (lambda ()
+        (next-token)  ; Skip 'if'
+        (define condition (parse-expression))
+        (define body (parse-indented-block))
+        (list :if condition body)))
+    
+    ;; Parse unless statement
+    (define parse-unless-statement
+      (lambda ()
+        (next-token)  ; Skip 'unless'
+        (define condition (parse-expression))
+        (next-token)  ; Skip 'then'
+        (define body (parse-indented-block))
+        (list :unless condition body)))
+    
+    ;; Parse while statement
+    (define parse-while-statement
+      (lambda ()
+        (next-token)  ; Skip 'while'
+        (define condition (parse-expression))
+        (define body (parse-indented-block))
+        (list :while condition body)))
+    
+    ;; Parse for statement
+    (define parse-for-statement
+      (lambda ()
+        (next-token)  ; Skip 'for'
+        (define variable (get-token-value (get-current-token)))
+        (next-token)  ; Skip variable
+        (next-token)  ; Skip 'in'
+        (define iterable (parse-expression))
+        (define body (parse-indented-block))
+        (list :for variable iterable body)))
+    
+    ;; Parse def statement
+    (define parse-def-statement
+      (lambda ()
+        (next-token)  ; Skip 'def'
+        (define name (get-token-value (get-current-token)))
+        (next-token)  ; Skip name
+        (define params (parse-parameter-list))
+        (define body (parse-indented-block))
+        (list :def name params body)))
+    
+    ;; Parse class statement
+    (define parse-class-statement
+      (lambda ()
+        (next-token)  ; Skip 'class'
+        (define name (get-token-value (get-current-token)))
+        (next-token)  ; Skip name
+        (define body (parse-indented-block))
+        (list :class name body)))
+    
+    ;; Parse stackit statement
+    (define parse-stackit-statement
+      (lambda ()
+        (next-token)  ; Skip 'stackit'
+        (define module (get-token-value (get-current-token)))
+        (next-token)  ; Skip module
+        (list :stackit module)))
+    
+    ;; Parse return statement
+    (define parse-return-statement
+      (lambda ()
+        (next-token)  ; Skip 'return'
+        (define value (parse-expression))
+        (list :return value)))
+    
+    ;; Parse assignment statement
+    (define parse-assignment-statement
+      (lambda ()
+        (define variable (get-token-value (get-current-token)))
+        (next-token)  ; Skip variable
+        (next-token)  ; Skip '='
+        (define value (parse-expression))
+        (list :assign variable value)))
+    
+    ;; Parse expression statement
+    (define parse-expression-statement
+      (lambda ()
+        (define expr (parse-expression))
+        (list :expression expr)))
+    
+    ;; Parse indented block
+    (define parse-indented-block
+      (lambda ()
+        (define statements (list))
+        (while (and (not (eq (get-current-token-type) :eof))
+                    (not (eq (get-current-token-type) :dedent)))
+          (let ((statement (parse-statement)))
+            (if statement
+                (push statements statement))))
+        (reverse statements)))
+    
+    ;; Parse expression
+    (define parse-expression
+      (lambda ()
+        (parse-logical-or))
+    
+    ;; Parse logical OR
+    (define parse-logical-or
+      (lambda ()
+        (define left (parse-logical-and))
+        (while (and (eq (get-current-token-type) :operator)
+                    (string= (get-token-value (get-current-token)) "or"))
+          (next-token)
+          (define right (parse-logical-and))
+          (set! left (list :or left right)))
+        left))
+    
+    ;; Parse logical AND
+    (define parse-logical-and
+      (lambda ()
+        (define left (parse-equality))
+        (while (and (eq (get-current-token-type) :operator)
+                    (string= (get-token-value (get-current-token)) "and"))
+          (next-token)
+          (define right (parse-equality))
+          (set! left (list :and left right)))
+        left))
+    
+    ;; Parse equality
+    (define parse-equality
+      (lambda ()
+        (define left (parse-comparison))
+        (while (and (eq (get-current-token-type) :operator)
+                    (member (get-token-value (get-current-token)) (list "==" "!=")))
+          (define op (get-token-value (get-current-token)))
+          (next-token)
+          (define right (parse-comparison))
+          (set! left (list (if (string= op "==") :eq :ne) left right)))
+        left))
+    
+    ;; Parse comparison
+    (define parse-comparison
+      (lambda ()
+        (define left (parse-addition))
+        (while (and (eq (get-current-token-type) :operator)
+                    (member (get-token-value (get-current-token)) (list "<" ">" "<=" ">=")))
+          (define op (get-token-value (get-current-token)))
+          (next-token)
+          (define right (parse-addition))
+          (set! left (list (case op
+                             ("<" :lt)
+                             (">" :gt)
+                             ("<=" :le)
+                             (">=" :ge)) left right)))
+        left))
+    
+    ;; Parse addition
+    (define parse-addition
+      (lambda ()
+        (define left (parse-multiplication))
+        (while (and (eq (get-current-token-type) :operator)
+                    (member (get-token-value (get-current-token)) (list "+" "-")))
+          (define op (get-token-value (get-current-token)))
+          (next-token)
+          (define right (parse-multiplication))
+          (set! left (list (if (string= op "+") :add :sub) left right)))
+        left))
+    
+    ;; Parse multiplication
+    (define parse-multiplication
+      (lambda ()
+        (define left (parse-primary))
+        (while (and (eq (get-current-token-type) :operator)
+                    (member (get-token-value (get-current-token)) (list "*" "/" "%")))
+          (define op (get-token-value (get-current-token)))
+          (next-token)
+          (define right (parse-primary))
+          (set! left (list (case op
+                             ("*" :mul)
+                             ("/" :div)
+                             ("%" :mod)) left right)))
+        left))
+    
+    ;; Parse primary expression
+    (define parse-primary
+      (lambda ()
+        (let ((token (get-current-token)))
+          (case (get-token-type token)
+            (:number (progn (next-token) (string-to-number (get-token-value token))))
+            (:string (progn (next-token) (get-token-value token)))
+            (:identifier (progn (next-token) (get-token-value token)))
+            (:keyword
+             (case (get-token-value token)
+               ("true" (progn (next-token) true))
+               ("false" (progn (next-token) false))
+               ("nil" (progn (next-token) nil))
+               (else (get-token-value token))))
+            (else (error "Unexpected token:" token)))))
+    
+    ;; Parse parameter list
+    (define parse-parameter-list
+      (lambda ()
+        (define params (list))
+        (while (and (not (eq (get-current-token-type) :newline))
+                    (not (eq (get-current-token-type) :eof)))
+          (if (eq (get-token-type (get-current-token)) :identifier)
+              (progn
+                (push params (get-token-value (get-current-token)))
+                (next-token)
+                (if (and (eq (get-current-token-type) :operator)
+                         (string= (get-token-value (get-current-token)) ","))
+                    (next-token)))))
+        (reverse params)))
+    
+    ;; Token utilities
+    (define get-current-token
+      (lambda ()
+        (if (null? tokens)
+            (list :eof "" line-number)
+            (car tokens))))
+    
+    (define get-current-token-type
+      (lambda ()
+        (get-token-type (get-current-token))))
+    
+    (define get-token-type
+      (lambda (token)
+        (car token)))
+    
+    (define get-token-value
+      (lambda (token)
+        (cadr token)))
+    
+    (define next-token
+      (lambda ()
+        (if (not (null? tokens))
+            (set! tokens (cdr tokens)))))
+    
+    ;; Character utilities
+    (define char-whitespace?
+      (lambda (char)
+        (or (char= char #\Space) (char= char #\Tab))))
+    
+    (define char-digit?
+      (lambda (char)
+        (and (char>= char #\0) (char<= char #\9))))
+    
+    (define char-alpha?
+      (lambda (char)
+        (or (and (char>= char #\a) (char<= char #\z))
+            (and (char>= char #\A) (char<= char #\Z)))))
+    
+    (define char-alphanumeric?
+      (lambda (char)
+        (or (char-digit? char) (char-alpha? char))))
+    
+    (define char-operator?
+      (lambda (char)
+        (member char (list #\= #\+ #\- #\* #\/ #\% #\< #\> #\! #\& #\|))))
+    
+    ;; String utilities
+    (define string-trim
+      (lambda (str)
+        (define start 0)
+        (define end (length str))
+        (while (and (< start end) (char-whitespace? (char-at str start)))
+          (set! start (+ start 1)))
+        (while (and (> end start) (char-whitespace? (char-at str (- end 1))))
+          (set! end (- end 1)))
+        (substring str start end)))
+    
+    (define split-lines
+      (lambda (str)
+        (define lines (list))
+        (define current-line "")
+        (dotimes (i (length str))
+          (let ((char (char-at str i)))
+            (if (char= char #\Newline)
+                (progn
+                  (push lines current-line)
+                  (set! current-line ""))
+                (set! current-line (string-append current-line (string char))))))
+        (if (not (string= current-line ""))
+            (push lines current-line))
+        (reverse lines)))
+    
+    (define substring
+      (lambda (str start end)
+        (define result "")
+        (dotimes (i (- end start))
+          (set! result (string-append result (string (char-at str (+ start i))))))
+        result))
+    
+    (define char-at
+      (lambda (str index)
+        (if (< index (length str))
+            (string-ref str index)
+            #\Null)))
+    
+    (define string-ref
+      (lambda (str index)
+        (char-at str index)))
+    
+    (define string-append
+      (lambda (str1 str2)
+        (concatenate 'string str1 str2)))
+    
+    (define string-to-number
+      (lambda (str)
+        (read-from-string str)))
+    
+    ;; Return parser
+    (list :parse-source parse-source)))
+
+;; =============================================================================
+;; DILIGAF NEW SYNTAX INTERPRETER
+;; =============================================================================
+
+(define diligaf-new-syntax-interpreter
+  (lambda ()
+    (define environment (make-hash-table))
+    (define classes (make-hash-table))
+    (define modules (make-hash-table))
+    
+    ;; Initialize built-in functions
+    (define init-builtins
+      (lambda ()
+        (set-hash-table-value environment "print" (lambda (x) (print x)))
+        (set-hash-table-value environment "input" (lambda () (read-line)))
+        (set-hash-table-value environment "len" (lambda (x) (length x)))
+        (set-hash-table-value environment "type" (lambda (x) (type-of x)))
+        (set-hash-table-value environment "str" (lambda (x) (string x)))
+        (set-hash-table-value environment "int" (lambda (x) (round x)))
+        (set-hash-table-value environment "float" (lambda (x) (float x))))))
+    
+    ;; Execute DILIGAF source with new syntax
+    (define execute-source
+      (lambda (source)
+        (define parser (diligaf-syntax-parser))
+        (define ast (funcall parser :parse-source source))
+        (execute-statements ast)))
+    
+    ;; Execute statements
+    (define execute-statements
+      (lambda (statements)
+        (define result nil)
+        (dolist (statement statements)
+          (set! result (execute-statement statement)))
+        result))
+    
+    ;; Execute single statement
+    (define execute-statement
+      (lambda (statement)
+        (case (car statement)
+          (:if (execute-if statement))
+          (:unless (execute-unless statement))
+          (:while (execute-while statement))
+          (:for (execute-for statement))
+          (:def (execute-def statement))
+          (:class (execute-class statement))
+          (:stackit (execute-stackit statement))
+          (:return (execute-return statement))
+          (:assign (execute-assign statement))
+          (:expression (execute-expression (cadr statement)))
+          (else (error "Unknown statement type:" (car statement))))))
+    
+    ;; Execute if statement
+    (define execute-if
+      (lambda (statement)
+        (define condition (execute-expression (cadr statement)))
+        (if condition
+            (execute-statements (caddr statement))
+            nil)))
+    
+    ;; Execute unless statement
+    (define execute-unless
+      (lambda (statement)
+        (define condition (execute-expression (cadr statement)))
+        (if (not condition)
+            (execute-statements (caddr statement))
+            nil)))
+    
+    ;; Execute while statement
+    (define execute-while
+      (lambda (statement)
+        (define condition (cadr statement))
+        (define body (caddr statement))
+        (while (execute-expression condition)
+          (execute-statements body))))
+    
+    ;; Execute for statement
+    (define execute-for
+      (lambda (statement)
+        (define variable (cadr statement))
+        (define iterable (execute-expression (caddr statement)))
+        (define body (cadddr statement))
+        (dolist (item iterable)
+          (set-hash-table-value environment variable item)
+          (execute-statements body))))
+    
+    ;; Execute def statement
+    (define execute-def
+      (lambda (statement)
+        (define name (cadr statement))
+        (define params (caddr statement))
+        (define body (cadddr statement))
+        (define function (lambda (&rest args)
+                           (let ((old-env (copy-hash-table environment)))
+                             (dotimes (i (length params))
+                               (set-hash-table-value environment (nth i params) (nth i args)))
+                             (execute-statements body))))
+        (set-hash-table-value environment name function)))
+    
+    ;; Execute class statement
+    (define execute-class
+      (lambda (statement)
+        (define name (cadr statement))
+        (define body (caddr statement))
+        (define class-def (list :name name :body body))
+        (set-hash-table-value classes name class-def)))
+    
+    ;; Execute stackit statement
+    (define execute-stackit
+      (lambda (statement)
+        (define module (cadr statement))
+        (load-module module)))
+    
+    ;; Execute return statement
+    (define execute-return
+      (lambda (statement)
+        (execute-expression (cadr statement))))
+    
+    ;; Execute assignment
+    (define execute-assign
+      (lambda (statement)
+        (define variable (cadr statement))
+        (define value (execute-expression (caddr statement)))
+        (set-hash-table-value environment variable value)))
+    
+    ;; Execute expression
+    (define execute-expression
+      (lambda (expr)
+        (cond
+          ((atom? expr) expr)
+          ((list? expr)
+           (case (car expr)
+             (:add (+ (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:sub (- (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:mul (* (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:div (/ (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:mod (mod (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:eq (= (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:ne (not (= (execute-expression (cadr expr)) (execute-expression (caddr expr)))))
+             (:lt (< (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:gt (> (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:le (<= (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:ge (>= (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:and (and (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (:or (or (execute-expression (cadr expr)) (execute-expression (caddr expr))))
+             (else (execute-function-call expr))))
+          (else expr))))
+    
+    ;; Execute function call
+    (define execute-function-call
+      (lambda (expr)
+        (define func-name (car expr))
+        (define args (map execute-expression (cdr expr)))
+        (define func (get-hash-table-value environment func-name))
+        (if func
+            (apply func args)
+            (error "Undefined function:" func-name))))
+    
+    ;; Load module
+    (define load-module
+      (lambda (module-name)
+        (define module-path (string-append module-name ".diligaf"))
+        (if (probe-file module-path)
+            (progn
+              (define module-source (read-file module-path))
+              (execute-source module-source))
+            (error "Module not found:" module-name))))
+    
+    ;; Utility functions
+    (define copy-hash-table
+      (lambda (ht)
+        (define new-ht (make-hash-table))
+        (maphash (lambda (k v) (set-hash-table-value new-ht k v)) ht)
+        new-ht))
+    
+    (define type-of
+      (lambda (x)
+        (cond
+          ((number? x) "number")
+          ((string? x) "string")
+          ((list? x) "list")
+          ((function? x) "function")
+          (else "unknown"))))
+    
+    ;; Initialize interpreter
+    (init-builtins)
+    
+    ;; Return interpreter
+    (list :execute-source execute-source
+          :environment environment
+          :classes classes
+          :modules modules)))
+
+;; =============================================================================
+;; DILIGAF NEW SYNTAX EXAMPLES
+;; =============================================================================
+
+(define test-new-syntax
+  (lambda ()
+    (print "DILIGAF New Syntax Test")
+    (print "=======================")
+    (print)
+    
+    (define interpreter (diligaf-new-syntax-interpreter))
+    
+    ;; Test basic syntax
+    (define test-code "x = 4
+if x < 3 print(\"fuck you\")
+if x > 3 print(\"hey there\")
+unless x = ? then print(\"damn mysterious\")")
+    
+    (print "Testing new syntax:")
+    (print test-code)
+    (print)
+    
+    (print "Executing...")
+    (funcall interpreter :execute-source test-code)
+    (print)
+    
+    (print "DILIGAF new syntax is working!")))
+
+;; Run test
+(test-new-syntax)

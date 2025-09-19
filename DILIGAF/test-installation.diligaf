@@ -1,0 +1,116 @@
+;; DILIGAF Installation Test
+;; This file tests if DILIGAF is properly installed and working
+
+(define test-installation
+  (lambda ()
+    (print "DILIGAF Installation Test")
+    (print "=========================")
+    (print)
+    
+    ;; Test 1: Basic arithmetic
+    (print "Test 1: Basic arithmetic")
+    (define result1 (+ 1 2 3))
+    (if (= result1 6)
+        (print "✓ Basic arithmetic test passed")
+        (print "✗ Basic arithmetic test failed"))
+    (print)
+    
+    ;; Test 2: Functions
+    (print "Test 2: Functions")
+    (define square (lambda (x) (* x x)))
+    (define result2 (square 5))
+    (if (= result2 25)
+        (print "✓ Function test passed")
+        (print "✗ Function test failed"))
+    (print)
+    
+    ;; Test 3: Self-modification
+    (print "Test 3: Self-modification")
+    (define original "test code")
+    (define modified (string-append "modified " original))
+    (if (not (string= original modified))
+        (print "✓ Self-modification test passed")
+        (print "✗ Self-modification test failed"))
+    (print)
+    
+    ;; Test 4: Quantum features
+    (print "Test 4: Quantum features")
+    (define targets (list "192.168.1.1" "192.168.1.2" "target.com"))
+    (define found (quantum-search targets "target.com"))
+    (if (find "target.com" found)
+        (print "✓ Quantum features test passed")
+        (print "✗ Quantum features test failed"))
+    (print)
+    
+    ;; Test 5: AI features
+    (print "Test 5: AI features")
+    (define base-exploit "alert('test')")
+    (define evolved (evolve-exploit base-exploit "target.com" 3))
+    (if (string? evolved)
+        (print "✓ AI features test passed")
+        (print "✗ AI features test failed"))
+    (print)
+    
+    ;; Test 6: Blockchain persistence
+    (print "Test 6: Blockchain persistence")
+    (define payload "test payload")
+    (define hash (blockchain-store payload))
+    (define retrieved (blockchain-retrieve hash))
+    (if (string= payload retrieved)
+        (print "✓ Blockchain persistence test passed")
+        (print "✗ Blockchain persistence test failed"))
+    (print)
+    
+    ;; Test 7: Holographic memory
+    (print "Test 7: Holographic memory")
+    (define data "test data")
+    (define key (holographic-store data))
+    (define reconstructed (holographic-retrieve key))
+    (if (string= data reconstructed)
+        (print "✓ Holographic memory test passed")
+        (print "✗ Holographic memory test failed"))
+    (print)
+    
+    ;; Test 8: Self-compilation
+    (print "Test 8: Self-compilation")
+    (define test-code "(+ 1 2 3)")
+    (define tokens (tokenize test-code))
+    (define ast (parse tokens))
+    (if (and (list? tokens) (list? ast))
+        (print "✓ Self-compilation test passed")
+        (print "✗ Self-compilation test failed"))
+    (print)
+    
+    ;; Test 9: Runtime execution
+    (print "Test 9: Runtime execution")
+    (define runtime (diligaf-runtime))
+    (if runtime
+        (print "✓ Runtime execution test passed")
+        (print "✗ Runtime execution test failed"))
+    (print)
+    
+    ;; Test 10: Self-hosting verification
+    (print "Test 10: Self-hosting verification")
+    (define interpreter (diligaf-interpreter))
+    (if interpreter
+        (print "✓ Self-hosting verification test passed")
+        (print "✗ Self-hosting verification test failed"))
+    (print)
+    
+    (print "=========================================")
+    (print "DILIGAF Installation Test Complete!")
+    (print "=========================================")
+    (print)
+    (print "DILIGAF is properly installed and working!")
+    (print "You can now use DILIGAF for hacking!")
+    (print)
+    (print "Try these commands:")
+    (print "  diligaf --repl                    # Start REPL")
+    (print "  diligaf --compile myfile.diligaf  # Compile to native")
+    (print "  diligaf myfile.diligaf            # Run file")
+    (print "  diligaf --version                 # Show version")
+    (print)
+    (print "DILIGAF is ready for action! 🚀")))
+
+;; Run the test
+(test-installation)

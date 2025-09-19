@@ -1,0 +1,712 @@
+;; DILIGAF Networking Library
+;; Network protocols, socket programming, and communication tools
+
+stackit socket
+stackit threading
+stackit time
+stackit random
+stackit struct
+stackit binascii
+
+;; =============================================================================
+;; DILIGAF NETWORKING LIBRARY
+;; =============================================================================
+
+class DiligafNet
+    def __init__(self)
+        self.sockets = dict()
+        self.listeners = list()
+        self.connections = list()
+        self.packet_handlers = dict()
+        self.protocol_handlers = dict()
+    
+    def create_socket(self, family=socket.AF_INET, type=socket.SOCK_STREAM, proto=0)
+        """Create a new socket"""
+        try
+            sock = socket.socket(family, type, proto)
+            sock_id = len(self.sockets)
+            self.sockets[sock_id] = sock
+            return sock_id
+        except Exception as e
+            error(f"Error creating socket: {e}")
+            return None
+    
+    def bind_socket(self, sock_id, address, port)
+        """Bind socket to address and port"""
+        try
+            sock = self.sockets[sock_id]
+            sock.bind((address, port))
+            return True
+        except Exception as e
+            error(f"Error binding socket {sock_id}: {e}")
+            return False
+    
+    def listen_socket(self, sock_id, backlog=5)
+        """Start listening on socket"""
+        try
+            sock = self.sockets[sock_id]
+            sock.listen(backlog)
+            return True
+        except Exception as e
+            error(f"Error listening on socket {sock_id}: {e}")
+            return False
+    
+    def accept_connection(self, sock_id)
+        """Accept incoming connection"""
+        try
+            sock = self.sockets[sock_id]
+            conn, addr = sock.accept()
+            conn_id = len(self.connections)
+            self.connections.append((conn, addr))
+            return conn_id, addr
+        except Exception as e
+            error(f"Error accepting connection on socket {sock_id}: {e}")
+            return None, None
+    
+    def connect_socket(self, sock_id, address, port)
+        """Connect socket to remote address"""
+        try
+            sock = self.sockets[sock_id]
+            sock.connect((address, port))
+            return True
+        except Exception as e
+            error(f"Error connecting socket {sock_id}: {e}")
+            return False
+    
+    def send_data(self, sock_id, data)
+        """Send data through socket"""
+        try
+            if sock_id < len(self.connections)
+                conn, addr = self.connections[sock_id]
+                return conn.send(data)
+            else
+                sock = self.sockets[sock_id]
+                return sock.send(data)
+        except Exception as e
+            error(f"Error sending data on socket {sock_id}: {e}")
+            return 0
+    
+    def receive_data(self, sock_id, buffer_size=4096)
+        """Receive data from socket"""
+        try
+            if sock_id < len(self.connections)
+                conn, addr = self.connections[sock_id]
+                return conn.recv(buffer_size)
+            else
+                sock = self.sockets[sock_id]
+                return sock.recv(buffer_size)
+        except Exception as e
+            error(f"Error receiving data on socket {sock_id}: {e}")
+            return b""
+    
+    def close_socket(self, sock_id)
+        """Close socket"""
+        try
+            if sock_id < len(self.connections)
+                conn, addr = self.connections[sock_id]
+                conn.close()
+            else
+                sock = self.sockets[sock_id]
+                sock.close()
+            return True
+        except Exception as e
+            error(f"Error closing socket {sock_id}: {e}")
+            return False
+    
+    def set_socket_options(self, sock_id, level, optname, value)
+        """Set socket options"""
+        try
+            if sock_id < len(self.connections)
+                conn, addr = self.connections[sock_id]
+                conn.setsockopt(level, optname, value)
+            else
+                sock = self.sockets[sock_id]
+                sock.setsockopt(level, optname, value)
+            return True
+        except Exception as e
+            error(f"Error setting socket options: {e}")
+            return False
+    
+    def get_socket_info(self, sock_id)
+        """Get socket information"""
+        try
+            if sock_id < len(self.connections)
+                conn, addr = self.connections[sock_id]
+                return {
+                    "type": "connection",
+                    "local_addr": conn.getsockname(),
+                    "remote_addr": conn.getpeername(),
+                    "connected": True
+                }
+            else
+                sock = self.sockets[sock_id]
+                return {
+                    "type": "socket",
+                    "local_addr": sock.getsockname(),
+                    "connected": False
+                }
+        except Exception as e
+            error(f"Error getting socket info: {e}")
+            return None
+
+;; HTTP Client
+class HTTPClient
+    def __init__(self)
+        self.user_agent = "DILIGAF/1.0.0"
+        self.timeout = 30
+        self.verify_ssl = True
+        self.cookies = dict()
+        self.headers = dict()
+    
+    def set_user_agent(self, user_agent)
+        self.user_agent = user_agent
+    
+    def set_timeout(self, timeout)
+        self.timeout = timeout
+    
+    def set_verify_ssl(self, verify)
+        self.verify_ssl = verify
+    
+    def add_header(self, name, value)
+        self.headers[name] = value
+    
+    def add_cookie(self, name, value)
+        self.cookies[name] = value
+    
+    def get(self, url, headers=None)
+        """Send HTTP GET request"""
+        return self._request("GET", url, headers=headers)
+    
+    def post(self, url, data=None, headers=None)
+        """Send HTTP POST request"""
+        return self._request("POST", url, data=data, headers=headers)
+    
+    def put(self, url, data=None, headers=None)
+        """Send HTTP PUT request"""
+        return self._request("PUT", url, data=data, headers=headers)
+    
+    def delete(self, url, headers=None)
+        """Send HTTP DELETE request"""
+        return self._request("DELETE", url, headers=headers)
+    
+    def _request(self, method, url, data=None, headers=None)
+        """Send HTTP request"""
+        try
+            import urllib.request
+            import urllib.parse
+            import urllib.error
+            
+            # Prepare headers
+            req_headers = self.headers.copy()
+            if headers
+                req_headers.update(headers)
+            req_headers["User-Agent"] = self.user_agent
+            
+            # Prepare data
+            if data
+                if isinstance(data, dict)
+                    data = urllib.parse.urlencode(data).encode()
+                elif isinstance(data, str)
+                    data = data.encode()
+            
+            # Create request
+            req = urllib.request.Request(url, data=data, headers=req_headers, method=method)
+            
+            # Send request
+            with urllib.request.urlopen(req, timeout=self.timeout) as response
+                return {
+                    "status_code": response.getcode(),
+                    "headers": dict(response.headers),
+                    "content": response.read(),
+                    "url": response.geturl()
+                }
+        except Exception as e
+            error(f"HTTP request error: {e}")
+            return None
+
+;; DNS Client
+class DNSClient
+    def __init__(self)
+        self.nameservers = ["8.8.8.8", "8.8.4.4", "1.1.1.1"]
+        self.timeout = 5
+    
+    def set_nameservers(self, nameservers)
+        self.nameservers = nameservers
+    
+    def set_timeout(self, timeout)
+        self.timeout = timeout
+    
+    def query(self, domain, record_type="A")
+        """Query DNS record"""
+        try
+            import dns.resolver
+            import dns.exception
+            
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = self.nameservers
+            resolver.timeout = self.timeout
+            
+            answers = resolver.resolve(domain, record_type)
+            results = list()
+            for answer in answers
+                results.append(str(answer))
+            return results
+        except Exception as e
+            error(f"DNS query error: {e}")
+            return list()
+    
+    def reverse_lookup(self, ip_address)
+        """Reverse DNS lookup"""
+        try
+            import dns.reversename
+            import dns.resolver
+            
+            resolver = dns.resolver.Resolver()
+            resolver.nameservers = self.nameservers
+            resolver.timeout = self.timeout
+            
+            reverse_name = dns.reversename.from_address(ip_address)
+            answers = resolver.resolve(reverse_name, "PTR")
+            results = list()
+            for answer in answers
+                results.append(str(answer))
+            return results
+        except Exception as e
+            error(f"Reverse DNS lookup error: {e}")
+            return list()
+    
+    def get_mx_records(self, domain)
+        """Get MX records for domain"""
+        return self.query(domain, "MX")
+    
+    def get_txt_records(self, domain)
+        """Get TXT records for domain"""
+        return self.query(domain, "TXT")
+    
+    def get_cname_records(self, domain)
+        """Get CNAME records for domain"""
+        return self.query(domain, "CNAME")
+    
+    def get_ns_records(self, domain)
+        """Get NS records for domain"""
+        return self.query(domain, "NS")
+    
+    def get_soa_records(self, domain)
+        """Get SOA records for domain"""
+        return self.query(domain, "SOA")
+
+;; FTP Client
+class FTPClient
+    def __init__(self)
+        self.connection = None
+        self.host = None
+        self.port = 21
+        self.username = None
+        self.password = None
+        self.timeout = 30
+    
+    def connect(self, host, port=21, username=None, password=None)
+        """Connect to FTP server"""
+        try
+            import ftplib
+            
+            self.host = host
+            self.port = port
+            self.username = username
+            self.password = password
+            
+            self.connection = ftplib.FTP()
+            self.connection.connect(host, port, timeout=self.timeout)
+            
+            if username and password
+                self.connection.login(username, password)
+            else
+                self.connection.login()
+            
+            return True
+        except Exception as e
+            error(f"FTP connection error: {e}")
+            return False
+    
+    def disconnect(self)
+        """Disconnect from FTP server"""
+        if self.connection
+            try
+                self.connection.quit()
+            except
+                pass
+            self.connection = None
+    
+    def list_directory(self, path=".")
+        """List directory contents"""
+        try
+            if not self.connection
+                return list()
+            
+            files = list()
+            self.connection.retrlines(f"LIST {path}", files.append)
+            return files
+        except Exception as e
+            error(f"FTP list directory error: {e}")
+            return list()
+    
+    def download_file(self, remote_path, local_path)
+        """Download file from FTP server"""
+        try
+            if not self.connection
+                return False
+            
+            with open(local_path, "wb") as f
+                self.connection.retrbinary(f"RETR {remote_path}", f.write)
+            return True
+        except Exception as e
+            error(f"FTP download error: {e}")
+            return False
+    
+    def upload_file(self, local_path, remote_path)
+        """Upload file to FTP server"""
+        try
+            if not self.connection
+                return False
+            
+            with open(local_path, "rb") as f
+                self.connection.storbinary(f"STOR {remote_path}", f)
+            return True
+        except Exception as e
+            error(f"FTP upload error: {e}")
+            return False
+    
+    def delete_file(self, remote_path)
+        """Delete file on FTP server"""
+        try
+            if not self.connection
+                return False
+            
+            self.connection.delete(remote_path)
+            return True
+        except Exception as e
+            error(f"FTP delete error: {e}")
+            return False
+    
+    def create_directory(self, remote_path)
+        """Create directory on FTP server"""
+        try
+            if not self.connection
+                return False
+            
+            self.connection.mkd(remote_path)
+            return True
+        except Exception as e
+            error(f"FTP create directory error: {e}")
+            return False
+    
+    def remove_directory(self, remote_path)
+        """Remove directory on FTP server"""
+        try
+            if not self.connection
+                return False
+            
+            self.connection.rmd(remote_path)
+            return True
+        except Exception as e
+            error(f"FTP remove directory error: {e}")
+            return False
+
+;; SSH Client
+class SSHClient
+    def __init__(self)
+        self.connection = None
+        self.host = None
+        self.port = 22
+        self.username = None
+        self.password = None
+        self.key_file = None
+        self.timeout = 30
+    
+    def connect(self, host, port=22, username=None, password=None, key_file=None)
+        """Connect to SSH server"""
+        try
+            import paramiko
+            
+            self.host = host
+            self.port = port
+            self.username = username
+            self.password = password
+            self.key_file = key_file
+            
+            self.connection = paramiko.SSHClient()
+            self.connection.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            
+            if key_file
+                self.connection.connect(host, port, username, key_filename=key_file, timeout=self.timeout)
+            else
+                self.connection.connect(host, port, username, password, timeout=self.timeout)
+            
+            return True
+        except Exception as e
+            error(f"SSH connection error: {e}")
+            return False
+    
+    def disconnect(self)
+        """Disconnect from SSH server"""
+        if self.connection
+            self.connection.close()
+            self.connection = None
+    
+    def execute_command(self, command)
+        """Execute command on SSH server"""
+        try
+            if not self.connection
+                return None
+            
+            stdin, stdout, stderr = self.connection.exec_command(command)
+            return {
+                "stdout": stdout.read().decode(),
+                "stderr": stderr.read().decode(),
+                "exit_code": stdout.channel.recv_exit_status()
+            }
+        except Exception as e
+            error(f"SSH command execution error: {e}")
+            return None
+    
+    def upload_file(self, local_path, remote_path)
+        """Upload file via SCP"""
+        try
+            if not self.connection
+                return False
+            
+            import scp
+            
+            with scp.SCPClient(self.connection.get_transport()) as scp_client
+                scp_client.put(local_path, remote_path)
+            return True
+        except Exception as e
+            error(f"SSH file upload error: {e}")
+            return False
+    
+    def download_file(self, remote_path, local_path)
+        """Download file via SCP"""
+        try
+            if not self.connection
+                return False
+            
+            import scp
+            
+            with scp.SCPClient(self.connection.get_transport()) as scp_client
+                scp_client.get(remote_path, local_path)
+            return True
+        except Exception as e
+            error(f"SSH file download error: {e}")
+            return False
+
+;; Port Scanner
+class PortScanner
+    def __init__(self)
+        self.timeout = 1
+        self.threads = 100
+        self.results = list()
+    
+    def set_timeout(self, timeout)
+        self.timeout = timeout
+    
+    def set_threads(self, threads)
+        self.threads = threads
+    
+    def scan_port(self, host, port)
+        """Scan single port"""
+        try
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(self.timeout)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            return result = 0
+        except Exception as e
+            return False
+    
+    def scan_ports(self, host, ports)
+        """Scan multiple ports"""
+        import concurrent.futures
+        
+        self.results = list()
+        
+        def scan_worker(port)
+            if self.scan_port(host, port)
+                self.results.append(port)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.threads) as executor
+            executor.map(scan_worker, ports)
+        
+        return self.results
+    
+    def scan_range(self, host, start_port, end_port)
+        """Scan port range"""
+        ports = list(range(start_port, end_port + 1))
+        return self.scan_ports(host, ports)
+    
+    def scan_common_ports(self, host)
+        """Scan common ports"""
+        common_ports = [21, 22, 23, 25, 53, 80, 110, 143, 443, 993, 995, 3389, 5432, 3306, 6379, 27017]
+        return self.scan_ports(host, common_ports)
+
+;; Packet Sniffer
+class PacketSniffer
+    def __init__(self)
+        self.interface = None
+        self.filter = ""
+        self.packets = list()
+        self.running = False
+        self.sniffer_thread = None
+    
+    def set_interface(self, interface)
+        self.interface = interface
+    
+    def set_filter(self, filter)
+        self.filter = filter
+    
+    def start_sniffing(self)
+        """Start packet sniffing"""
+        try
+            import scapy.all as scapy
+            
+            self.running = True
+            self.sniffer_thread = threading.Thread(target=self._sniff_packets)
+            self.sniffer_thread.start()
+            return True
+        except Exception as e
+            error(f"Packet sniffing error: {e}")
+            return False
+    
+    def stop_sniffing(self)
+        """Stop packet sniffing"""
+        self.running = False
+        if self.sniffer_thread
+            self.sniffer_thread.join()
+    
+    def _sniff_packets(self)
+        """Internal packet sniffing function"""
+        try
+            import scapy.all as scapy
+            
+            def packet_handler(packet)
+                if self.running
+                    self.packets.append(packet)
+            
+            scapy.sniff(iface=self.interface, filter=self.filter, prn=packet_handler, stop_filter=lambda x: not self.running)
+        except Exception as e
+            error(f"Packet sniffing thread error: {e}")
+    
+    def get_packets(self)
+        """Get captured packets"""
+        return self.packets.copy()
+    
+    def clear_packets(self)
+        """Clear captured packets"""
+        self.packets.clear()
+    
+    def analyze_packets(self)
+        """Analyze captured packets"""
+        analysis = {
+            "total_packets": len(self.packets),
+            "protocols": dict(),
+            "source_ips": dict(),
+            "dest_ips": dict(),
+            "ports": dict()
+        }
+        
+        for packet in self.packets
+            # Count protocols
+            if hasattr(packet, "proto")
+                proto = packet.proto
+                analysis["protocols"][proto] = analysis["protocols"].get(proto, 0) + 1
+            
+            # Count source IPs
+            if hasattr(packet, "src")
+                src = packet.src
+                analysis["source_ips"][src] = analysis["source_ips"].get(src, 0) + 1
+            
+            # Count destination IPs
+            if hasattr(packet, "dst")
+                dst = packet.dst
+                analysis["dest_ips"][dst] = analysis["dest_ips"].get(dst, 0) + 1
+            
+            # Count ports
+            if hasattr(packet, "sport")
+                sport = packet.sport
+                analysis["ports"][sport] = analysis["ports"].get(sport, 0) + 1
+            
+            if hasattr(packet, "dport")
+                dport = packet.dport
+                analysis["ports"][dport] = analysis["ports"].get(dport, 0) + 1
+        
+        return analysis
+
+;; Export networking functionality
+net = DiligafNet()
+http = HTTPClient()
+dns = DNSClient()
+ftp = FTPClient()
+ssh = SSHClient()
+scanner = PortScanner()
+sniffer = PacketSniffer()
+
+;; Convenience functions
+def create_socket(family=socket.AF_INET, type=socket.SOCK_STREAM)
+    return net.create_socket(family, type)
+
+def bind_socket(sock_id, address, port)
+    return net.bind_socket(sock_id, address, port)
+
+def listen_socket(sock_id, backlog=5)
+    return net.listen_socket(sock_id, backlog)
+
+def accept_connection(sock_id)
+    return net.accept_connection(sock_id)
+
+def connect_socket(sock_id, address, port)
+    return net.connect_socket(sock_id, address, port)
+
+def send_data(sock_id, data)
+    return net.send_data(sock_id, data)
+
+def receive_data(sock_id, buffer_size=4096)
+    return net.receive_data(sock_id, buffer_size)
+
+def close_socket(sock_id)
+    return net.close_socket(sock_id)
+
+def http_get(url, headers=None)
+    return http.get(url, headers)
+
+def http_post(url, data=None, headers=None)
+    return http.post(url, data, headers)
+
+def dns_query(domain, record_type="A")
+    return dns.query(domain, record_type)
+
+def scan_port(host, port)
+    return scanner.scan_port(host, port)
+
+def scan_ports(host, ports)
+    return scanner.scan_ports(host, ports)
+
+def scan_range(host, start_port, end_port)
+    return scanner.scan_range(host, start_port, end_port)
+
+def scan_common_ports(host)
+    return scanner.scan_common_ports(host)
+
+def start_sniffing(interface=None, filter="")
+    if interface
+        sniffer.set_interface(interface)
+    if filter
+        sniffer.set_filter(filter)
+    return sniffer.start_sniffing()
+
+def stop_sniffing()
+    sniffer.stop_sniffing()
+
+def get_packets()
+    return sniffer.get_packets()
+
+def analyze_packets()
+    return sniffer.analyze_packets()

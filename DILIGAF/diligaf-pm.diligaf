@@ -1,0 +1,618 @@
+;; DILIGAF Package Manager
+;; Install, manage, and update DILIGAF libraries
+
+stackit os
+stackit sys
+stackit json
+stackit urllib.request
+stackit urllib.parse
+stackit zipfile
+stackit tempfile
+stackit shutil
+
+;; =============================================================================
+;; DILIGAF PACKAGE MANAGER
+;; =============================================================================
+
+class DiligafPackageManager
+    def __init__(self)
+        self.package_dir = os.path.join(os.path.expanduser("~"), ".diligaf", "packages")
+        self.cache_dir = os.path.join(os.path.expanduser("~"), ".diligaf", "cache")
+        self.config_file = os.path.join(os.path.expanduser("~"), ".diligaf", "config.json")
+        self.registry_url = "https://packages.diligaf.dev"
+        self.installed_packages = dict()
+        self.available_packages = dict()
+        self.dependencies = dict()
+        
+        # Create directories
+        self._create_directories()
+        
+        # Load configuration
+        self._load_config()
+        
+        # Load installed packages
+        self._load_installed_packages()
+    
+    def _create_directories(self)
+        """Create necessary directories"""
+        try
+            os.makedirs(self.package_dir, exist_ok=True)
+            os.makedirs(self.cache_dir, exist_ok=True)
+            os.makedirs(os.path.dirname(self.config_file), exist_ok=True)
+        except Exception as e
+            error(f"Error creating directories: {e}")
+    
+    def _load_config(self)
+        """Load configuration from file"""
+        try
+            if os.path.exists(self.config_file)
+                with open(self.config_file, 'r') as f
+                    config = json.load(f)
+                    self.registry_url = config.get("registry_url", self.registry_url)
+                    self.package_dir = config.get("package_dir", self.package_dir)
+                    self.cache_dir = config.get("cache_dir", self.cache_dir)
+            else
+                self._save_config()
+        except Exception as e
+            error(f"Error loading configuration: {e}")
+    
+    def _save_config(self)
+        """Save configuration to file"""
+        try
+            config = {
+                "registry_url": self.registry_url,
+                "package_dir": self.package_dir,
+                "cache_dir": self.cache_dir,
+                "version": "1.0.0"
+            }
+            with open(self.config_file, 'w') as f
+                json.dump(config, f, indent=2)
+        except Exception as e
+            error(f"Error saving configuration: {e}")
+    
+    def _load_installed_packages(self)
+        """Load installed packages from package directory"""
+        try
+            if os.path.exists(self.package_dir)
+                for package_name in os.listdir(self.package_dir)
+                    package_path = os.path.join(self.package_dir, package_name)
+                    if os.path.isdir(package_path)
+                        manifest_file = os.path.join(package_path, "manifest.json")
+                        if os.path.exists(manifest_file)
+                            with open(manifest_file, 'r') as f
+                                manifest = json.load(f)
+                                self.installed_packages[package_name] = manifest
+        except Exception as e
+            error(f"Error loading installed packages: {e}")
+    
+    def _save_package_manifest(self, package_name, manifest)
+        """Save package manifest"""
+        try
+            package_path = os.path.join(self.package_dir, package_name)
+            manifest_file = os.path.join(package_path, "manifest.json")
+            with open(manifest_file, 'w') as f
+                json.dump(manifest, f, indent=2)
+        except Exception as e
+            error(f"Error saving package manifest: {e}")
+    
+    def search_packages(self, query="")
+        """Search for packages in registry"""
+        try
+            search_url = f"{self.registry_url}/search"
+            if query
+                search_url += f"?q={urllib.parse.quote(query)}"
+            
+            with urllib.request.urlopen(search_url) as response
+                data = json.loads(response.read().decode())
+                self.available_packages = data.get("packages", dict())
+                return self.available_packages
+        except Exception as e
+            error(f"Error searching packages: {e}")
+            return dict()
+    
+    def get_package_info(self, package_name)
+        """Get package information from registry"""
+        try
+            info_url = f"{self.registry_url}/package/{urllib.parse.quote(package_name)}"
+            with urllib.request.urlopen(info_url) as response
+                data = json.loads(response.read().decode())
+                return data
+        except Exception as e
+            error(f"Error getting package info: {e}")
+            return None
+    
+    def install_package(self, package_name, version="latest")
+        """Install a package"""
+        try
+            # Get package information
+            package_info = self.get_package_info(package_name)
+            if not package_info
+                error(f"Package {package_name} not found")
+                return False
+            
+            # Check if already installed
+            if package_name in self.installed_packages
+                current_version = self.installed_packages[package_name].get("version", "unknown")
+                if version = "latest" or version = current_version
+                    info(f"Package {package_name} is already installed (version {current_version})")
+                    return True
+            
+            # Download package
+            download_url = package_info.get("download_url")
+            if not download_url
+                error(f"No download URL for package {package_name}")
+                return False
+            
+            # Create package directory
+            package_path = os.path.join(self.package_dir, package_name)
+            os.makedirs(package_path, exist_ok=True)
+            
+            # Download and extract package
+            if not self._download_and_extract_package(download_url, package_path)
+                return False
+            
+            # Install dependencies
+            dependencies = package_info.get("dependencies", list())
+            for dep in dependencies
+                dep_name = dep.get("name")
+                dep_version = dep.get("version", "latest")
+                if not self.install_package(dep_name, dep_version)
+                    error(f"Failed to install dependency {dep_name}")
+                    return False
+            
+            # Save package manifest
+            manifest = {
+                "name": package_name,
+                "version": package_info.get("version", "unknown"),
+                "description": package_info.get("description", ""),
+                "author": package_info.get("author", ""),
+                "license": package_info.get("license", ""),
+                "dependencies": dependencies,
+                "installed_at": time.time(),
+                "files": self._get_package_files(package_path)
+            }
+            self._save_package_manifest(package_name, manifest)
+            self.installed_packages[package_name] = manifest
+            
+            info(f"Package {package_name} installed successfully")
+            return True
+        except Exception as e
+            error(f"Error installing package {package_name}: {e}")
+            return False
+    
+    def _download_and_extract_package(self, download_url, package_path)
+        """Download and extract package"""
+        try
+            # Download package
+            with urllib.request.urlopen(download_url) as response
+                package_data = response.read()
+            
+            # Save to temporary file
+            with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as temp_file
+                temp_file.write(package_data)
+                temp_file_path = temp_file.name
+            
+            # Extract package
+            with zipfile.ZipFile(temp_file_path, 'r') as zip_file
+                zip_file.extractall(package_path)
+            
+            # Clean up temporary file
+            os.unlink(temp_file_path)
+            
+            return True
+        except Exception as e
+            error(f"Error downloading and extracting package: {e}")
+            return False
+    
+    def _get_package_files(self, package_path)
+        """Get list of files in package"""
+        try
+            files = list()
+            for root, dirs, filenames in os.walk(package_path)
+                for filename in filenames
+                    file_path = os.path.join(root, filename)
+                    rel_path = os.path.relpath(file_path, package_path)
+                    files.append(rel_path)
+            return files
+        except Exception as e
+            error(f"Error getting package files: {e}")
+            return list()
+    
+    def uninstall_package(self, package_name)
+        """Uninstall a package"""
+        try
+            if package_name not in self.installed_packages
+                error(f"Package {package_name} is not installed")
+                return False
+            
+            # Check for dependent packages
+            dependent_packages = self._get_dependent_packages(package_name)
+            if dependent_packages
+                error(f"Cannot uninstall {package_name}: it is required by {', '.join(dependent_packages)}")
+                return False
+            
+            # Remove package directory
+            package_path = os.path.join(self.package_dir, package_name)
+            if os.path.exists(package_path)
+                shutil.rmtree(package_path)
+            
+            # Remove from installed packages
+            del self.installed_packages[package_name]
+            
+            info(f"Package {package_name} uninstalled successfully")
+            return True
+        except Exception as e
+            error(f"Error uninstalling package {package_name}: {e}")
+            return False
+    
+    def _get_dependent_packages(self, package_name)
+        """Get packages that depend on the given package"""
+        try
+            dependent_packages = list()
+            for pkg_name, pkg_info in self.installed_packages.items()
+                dependencies = pkg_info.get("dependencies", list())
+                for dep in dependencies
+                    if dep.get("name") = package_name
+                        dependent_packages.append(pkg_name)
+            return dependent_packages
+        except Exception as e
+            error(f"Error getting dependent packages: {e}")
+            return list()
+    
+    def update_package(self, package_name)
+        """Update a package to latest version"""
+        try
+            if package_name not in self.installed_packages
+                error(f"Package {package_name} is not installed")
+                return False
+            
+            # Get latest version info
+            package_info = self.get_package_info(package_name)
+            if not package_info
+                error(f"Package {package_name} not found in registry")
+                return False
+            
+            current_version = self.installed_packages[package_name].get("version", "unknown")
+            latest_version = package_info.get("version", "unknown")
+            
+            if current_version = latest_version
+                info(f"Package {package_name} is already up to date (version {current_version})")
+                return True
+            
+            # Uninstall current version
+            if not self.uninstall_package(package_name)
+                return False
+            
+            # Install latest version
+            return self.install_package(package_name, "latest")
+        except Exception as e
+            error(f"Error updating package {package_name}: {e}")
+            return False
+    
+    def list_installed_packages(self)
+        """List all installed packages"""
+        try
+            if not self.installed_packages
+                info("No packages installed")
+                return dict()
+            
+            info("Installed packages:")
+            for package_name, package_info in self.installed_packages.items()
+                version = package_info.get("version", "unknown")
+                description = package_info.get("description", "")
+                print(f"  {package_name} ({version}) - {description}")
+            
+            return self.installed_packages
+        except Exception as e
+            error(f"Error listing installed packages: {e}")
+            return dict()
+    
+    def list_available_packages(self, query="")
+        """List available packages from registry"""
+        try
+            packages = self.search_packages(query)
+            if not packages
+                info("No packages found")
+                return dict()
+            
+            info("Available packages:")
+            for package_name, package_info in packages.items()
+                version = package_info.get("version", "unknown")
+                description = package_info.get("description", "")
+                print(f"  {package_name} ({version}) - {description}")
+            
+            return packages
+        except Exception as e
+            error(f"Error listing available packages: {e}")
+            return dict()
+    
+    def show_package_info(self, package_name)
+        """Show detailed information about a package"""
+        try
+            if package_name in self.installed_packages
+                package_info = self.installed_packages[package_name]
+                info(f"Package: {package_name}")
+                print(f"  Version: {package_info.get('version', 'unknown')}")
+                print(f"  Description: {package_info.get('description', '')}")
+                print(f"  Author: {package_info.get('author', '')}")
+                print(f"  License: {package_info.get('license', '')}")
+                print(f"  Installed: {time.ctime(package_info.get('installed_at', 0))}")
+                
+                dependencies = package_info.get('dependencies', list())
+                if dependencies
+                    print("  Dependencies:")
+                    for dep in dependencies
+                        print(f"    {dep.get('name', '')} ({dep.get('version', 'latest')})")
+                
+                files = package_info.get('files', list())
+                if files
+                    print(f"  Files: {len(files)} files installed")
+            else
+                package_info = self.get_package_info(package_name)
+                if package_info
+                    info(f"Package: {package_name}")
+                    print(f"  Version: {package_info.get('version', 'unknown')}")
+                    print(f"  Description: {package_info.get('description', '')}")
+                    print(f"  Author: {package_info.get('author', '')}")
+                    print(f"  License: {package_info.get('license', '')}")
+                    
+                    dependencies = package_info.get('dependencies', list())
+                    if dependencies
+                        print("  Dependencies:")
+                        for dep in dependencies
+                            print(f"    {dep.get('name', '')} ({dep.get('version', 'latest')})")
+                else
+                    error(f"Package {package_name} not found")
+                    return False
+            
+            return True
+        except Exception as e
+            error(f"Error showing package info: {e}")
+            return False
+    
+    def update_all_packages(self)
+        """Update all installed packages"""
+        try
+            updated_packages = list()
+            failed_packages = list()
+            
+            for package_name in self.installed_packages.keys()
+                info(f"Updating {package_name}...")
+                if self.update_package(package_name)
+                    updated_packages.append(package_name)
+                else
+                    failed_packages.append(package_name)
+            
+            info(f"Updated {len(updated_packages)} packages")
+            if failed_packages
+                error(f"Failed to update {len(failed_packages)} packages: {', '.join(failed_packages)}")
+            
+            return len(failed_packages) = 0
+        except Exception as e
+            error(f"Error updating all packages: {e}")
+            return False
+    
+    def clean_cache(self)
+        """Clean package cache"""
+        try
+            if os.path.exists(self.cache_dir)
+                shutil.rmtree(self.cache_dir)
+                os.makedirs(self.cache_dir)
+                info("Package cache cleaned")
+                return True
+            else
+                info("No cache to clean")
+                return True
+        except Exception as e
+            error(f"Error cleaning cache: {e}")
+            return False
+    
+    def export_package_list(self, filename="packages.json")
+        """Export list of installed packages"""
+        try
+            export_data = {
+                "packages": self.installed_packages,
+                "exported_at": time.time(),
+                "diligaf_version": "1.0.0"
+            }
+            
+            with open(filename, 'w') as f
+                json.dump(export_data, f, indent=2)
+            
+            info(f"Package list exported to {filename}")
+            return True
+        except Exception as e
+            error(f"Error exporting package list: {e}")
+            return False
+    
+    def import_package_list(self, filename="packages.json")
+        """Import and install packages from list"""
+        try
+            with open(filename, 'r') as f
+                import_data = json.load(f)
+            
+            packages = import_data.get("packages", dict())
+            if not packages
+                error("No packages found in import file")
+                return False
+            
+            installed_count = 0
+            failed_count = 0
+            
+            for package_name, package_info in packages.items()
+                version = package_info.get("version", "latest")
+                info(f"Installing {package_name} ({version})...")
+                if self.install_package(package_name, version)
+                    installed_count += 1
+                else
+                    failed_count += 1
+            
+            info(f"Imported {installed_count} packages")
+            if failed_count > 0
+                error(f"Failed to import {failed_count} packages")
+            
+            return failed_count = 0
+        except Exception as e
+            error(f"Error importing package list: {e}")
+            return False
+
+;; Package Registry
+class PackageRegistry
+    def __init__(self, registry_url="https://packages.diligaf.dev")
+        self.registry_url = registry_url
+        self.packages = dict()
+    
+    def add_package(self, package_name, package_info)
+        """Add package to registry"""
+        self.packages[package_name] = package_info
+    
+    def get_package(self, package_name)
+        """Get package from registry"""
+        return self.packages.get(package_name)
+    
+    def list_packages(self)
+        """List all packages in registry"""
+        return self.packages
+    
+    def search_packages(self, query)
+        """Search packages by name or description"""
+        results = dict()
+        query_lower = query.lower()
+        
+        for package_name, package_info in self.packages.items()
+            if (query_lower in package_name.lower() or 
+                query_lower in package_info.get("description", "").lower()):
+                results[package_name] = package_info
+        
+        return results
+
+;; Export package manager functionality
+pm = DiligafPackageManager()
+registry = PackageRegistry()
+
+;; Convenience functions
+def install(package_name, version="latest")
+    """Install a package"""
+    return pm.install_package(package_name, version)
+
+def uninstall(package_name)
+    """Uninstall a package"""
+    return pm.uninstall_package(package_name)
+
+def update(package_name)
+    """Update a package"""
+    return pm.update_package(package_name)
+
+def update_all()
+    """Update all packages"""
+    return pm.update_all_packages()
+
+def list_installed()
+    """List installed packages"""
+    return pm.list_installed_packages()
+
+def list_available(query="")
+    """List available packages"""
+    return pm.list_available_packages(query)
+
+def search(query)
+    """Search for packages"""
+    return pm.search_packages(query)
+
+def info(package_name)
+    """Show package information"""
+    return pm.show_package_info(package_name)
+
+def clean_cache()
+    """Clean package cache"""
+    return pm.clean_cache()
+
+def export_packages(filename="packages.json")
+    """Export package list"""
+    return pm.export_package_list(filename)
+
+def import_packages(filename="packages.json")
+    """Import package list"""
+    return pm.import_package_list(filename)
+
+;; CLI Interface
+def main()
+    """Main CLI interface"""
+    if len(sys.argv) < 2
+        print("DILIGAF Package Manager v1.0.0")
+        print("Usage: diligaf-pm <command> [arguments]")
+        print("")
+        print("Commands:")
+        print("  install <package> [version]  Install a package")
+        print("  uninstall <package>          Uninstall a package")
+        print("  update <package>             Update a package")
+        print("  update-all                   Update all packages")
+        print("  list                         List installed packages")
+        print("  search <query>               Search for packages")
+        print("  info <package>               Show package information")
+        print("  clean-cache                  Clean package cache")
+        print("  export [filename]            Export package list")
+        print("  import <filename>            Import package list")
+        return
+    
+    command = sys.argv[1]
+    
+    if command = "install"
+        if len(sys.argv) < 3
+            error("Package name required")
+            return
+        package_name = sys.argv[2]
+        version = sys.argv[3] if len(sys.argv) > 3 else "latest"
+        install(package_name, version)
+    
+    elif command = "uninstall"
+        if len(sys.argv) < 3
+            error("Package name required")
+            return
+        package_name = sys.argv[2]
+        uninstall(package_name)
+    
+    elif command = "update"
+        if len(sys.argv) < 3
+            error("Package name required")
+            return
+        package_name = sys.argv[2]
+        update(package_name)
+    
+    elif command = "update-all"
+        update_all()
+    
+    elif command = "list"
+        list_installed()
+    
+    elif command = "search"
+        query = sys.argv[2] if len(sys.argv) > 2 else ""
+        search(query)
+    
+    elif command = "info"
+        if len(sys.argv) < 3
+            error("Package name required")
+            return
+        package_name = sys.argv[2]
+        info(package_name)
+    
+    elif command = "clean-cache"
+        clean_cache()
+    
+    elif command = "export"
+        filename = sys.argv[2] if len(sys.argv) > 2 else "packages.json"
+        export_packages(filename)
+    
+    elif command = "import"
+        if len(sys.argv) < 3
+            error("Filename required")
+            return
+        filename = sys.argv[2]
+        import_packages(filename)
+    
+    else
+        error(f"Unknown command: {command}")
+
+;; Run CLI if called directly
+if __name__ = "__main__"
+    main()

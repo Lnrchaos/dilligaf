@@ -1,0 +1,524 @@
+;; DILIGAF Core Library
+;; Essential utilities and base functionality
+
+stackit os
+stackit sys
+stackit time
+stackit random
+
+;; =============================================================================
+;; DILIGAF CORE LIBRARY
+;; =============================================================================
+
+class DiligafCore
+    def __init__(self)
+        self.version = "1.0.0"
+        self.platform = self.detect_platform()
+        self.architecture = self.detect_architecture()
+        self.capabilities = self.detect_capabilities()
+    
+    def detect_platform(self)
+        if os.name = "nt"
+            return "windows"
+        elif os.name = "posix"
+            return "unix"
+        else
+            return "unknown"
+    
+    def detect_architecture(self)
+        return os.uname().machine
+    
+    def detect_capabilities(self)
+        caps = list()
+        if self.platform = "unix"
+            caps.append("raw_sockets")
+            caps.append("proc_access")
+            caps.append("dev_access")
+        if self.platform = "windows"
+            caps.append("registry_access")
+            caps.append("service_control")
+        return caps
+    
+    def get_system_info(self)
+        return {
+            "platform": self.platform,
+            "architecture": self.architecture,
+            "capabilities": self.capabilities,
+            "python_version": sys.version,
+            "diligaf_version": self.version
+        }
+    
+    def is_root(self)
+        if self.platform = "unix"
+            return os.geteuid() = 0
+        elif self.platform = "windows"
+            import ctypes
+            return ctypes.windll.shell32.IsUserAnAdmin()
+        return false
+    
+    def require_root(self)
+        if not self.is_root()
+            print("Error: This operation requires root/administrator privileges")
+            sys.exit(1)
+    
+    def get_temp_dir(self)
+        return os.path.join(os.path.expanduser("~"), ".diligaf", "tmp")
+    
+    def create_temp_file(self, prefix="diligaf", suffix=".tmp")
+        temp_dir = self.get_temp_dir()
+        if not os.path.exists(temp_dir)
+            os.makedirs(temp_dir)
+        return os.path.join(temp_dir, f"{prefix}_{random.randint(1000, 9999)}{suffix}")
+    
+    def cleanup_temp_files(self)
+        temp_dir = self.get_temp_dir()
+        if os.path.exists(temp_dir)
+            for file in os.listdir(temp_dir)
+                if file.startswith("diligaf_")
+                    os.remove(os.path.join(temp_dir, file))
+    
+    def log(self, level, message)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[{timestamp}] [{level.upper()}] {message}")
+    
+    def debug(self, message)
+        self.log("debug", message)
+    
+    def info(self, message)
+        self.log("info", message)
+    
+    def warning(self, message)
+        self.log("warning", message)
+    
+    def error(self, message)
+        self.log("error", message)
+    
+    def critical(self, message)
+        self.log("critical", message)
+
+;; Utility functions
+def hex_dump(data, width=16)
+    """Convert binary data to hex dump format"""
+    result = ""
+    for i in range(0, len(data), width)
+        chunk = data[i:i+width]
+        hex_part = " ".join(f"{b:02x}" for b in chunk)
+        ascii_part = "".join(chr(b) if 32 <= b <= 126 else "." for b in chunk)
+        result += f"{i:08x}: {hex_part:<{width*3}} |{ascii_part}|\n"
+    return result
+
+def bytes_to_int(data, endian="little")
+    """Convert bytes to integer"""
+    if endian = "little"
+        return int.from_bytes(data, "little")
+    else
+        return int.from_bytes(data, "big")
+
+def int_to_bytes(value, length, endian="little")
+    """Convert integer to bytes"""
+    if endian = "little"
+        return value.to_bytes(length, "little")
+    else
+        return value.to_bytes(length, "big")
+
+def xor_data(data, key)
+    """XOR data with key"""
+    result = bytearray()
+    key_len = len(key)
+    for i in range(len(data))
+        result.append(data[i] ^ key[i % key_len])
+    return bytes(result)
+
+def rot13(text)
+    """ROT13 cipher"""
+    result = ""
+    for char in text
+        if char.isalpha()
+            if char.islower()
+                result += chr((ord(char) - ord('a') + 13) % 26 + ord('a'))
+            else
+                result += chr((ord(char) - ord('A') + 13) % 26 + ord('A'))
+        else
+            result += char
+    return result
+
+def base64_encode(data)
+    """Base64 encode data"""
+    import base64
+    return base64.b64encode(data).decode()
+
+def base64_decode(data)
+    """Base64 decode data"""
+    import base64
+    return base64.b64decode(data)
+
+def url_encode(text)
+    """URL encode text"""
+    import urllib.parse
+    return urllib.parse.quote(text)
+
+def url_decode(text)
+    """URL decode text"""
+    import urllib.parse
+    return urllib.parse.unquote(text)
+
+def generate_random_string(length=16, charset="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789")
+    """Generate random string"""
+    return "".join(random.choice(charset) for _ in range(length))
+
+def generate_random_bytes(length=16)
+    """Generate random bytes"""
+    return os.urandom(length)
+
+def calculate_checksum(data, algorithm="md5")
+    """Calculate checksum of data"""
+    import hashlib
+    if algorithm = "md5"
+        return hashlib.md5(data).hexdigest()
+    elif algorithm = "sha1"
+        return hashlib.sha1(data).hexdigest()
+    elif algorithm = "sha256"
+        return hashlib.sha256(data).hexdigest()
+    else
+        return hashlib.md5(data).hexdigest()
+
+def file_exists(path)
+    """Check if file exists"""
+    return os.path.exists(path)
+
+def is_file(path)
+    """Check if path is a file"""
+    return os.path.isfile(path)
+
+def is_dir(path)
+    """Check if path is a directory"""
+    return os.path.isdir(path)
+
+def get_file_size(path)
+    """Get file size in bytes"""
+    if file_exists(path)
+        return os.path.getsize(path)
+    return 0
+
+def read_file(path, mode="r")
+    """Read file content"""
+    try
+        with open(path, mode) as f
+            return f.read()
+    except Exception as e
+        print(f"Error reading file {path}: {e}")
+        return None
+
+def write_file(path, content, mode="w")
+    """Write content to file"""
+    try
+        with open(path, mode) as f
+            f.write(content)
+        return True
+    except Exception as e
+        print(f"Error writing file {path}: {e}")
+        return False
+
+def append_file(path, content)
+    """Append content to file"""
+    return write_file(path, content, "a")
+
+def copy_file(src, dst)
+    """Copy file from src to dst"""
+    try
+        import shutil
+        shutil.copy2(src, dst)
+        return True
+    except Exception as e
+        print(f"Error copying file {src} to {dst}: {e}")
+        return False
+
+def move_file(src, dst)
+    """Move file from src to dst"""
+    try
+        import shutil
+        shutil.move(src, dst)
+        return True
+    except Exception as e
+        print(f"Error moving file {src} to {dst}: {e}")
+        return False
+
+def delete_file(path)
+    """Delete file"""
+    try
+        os.remove(path)
+        return True
+    except Exception as e
+        print(f"Error deleting file {path}: {e}")
+        return False
+
+def create_dir(path)
+    """Create directory"""
+    try
+        os.makedirs(path, exist_ok=True)
+        return True
+    except Exception as e
+        print(f"Error creating directory {path}: {e}")
+        return False
+
+def list_dir(path=".")
+    """List directory contents"""
+    try
+        return os.listdir(path)
+    except Exception as e
+        print(f"Error listing directory {path}: {e}")
+        return list()
+
+def get_file_permissions(path)
+    """Get file permissions"""
+    if file_exists(path)
+        return oct(os.stat(path).st_mode)[-3:]
+    return None
+
+def set_file_permissions(path, mode)
+    """Set file permissions"""
+    try
+        os.chmod(path, int(mode, 8))
+        return True
+    except Exception as e
+        print(f"Error setting permissions for {path}: {e}")
+        return False
+
+def get_file_owner(path)
+    """Get file owner"""
+    if file_exists(path)
+        stat = os.stat(path)
+        return {
+            "uid": stat.st_uid,
+            "gid": stat.st_gid
+        }
+    return None
+
+def get_file_timestamps(path)
+    """Get file timestamps"""
+    if file_exists(path)
+        stat = os.stat(path)
+        return {
+            "atime": stat.st_atime,
+            "mtime": stat.st_mtime,
+            "ctime": stat.st_ctime
+        }
+    return None
+
+def find_files(directory, pattern="*", recursive=True)
+    """Find files matching pattern"""
+    import glob
+    if recursive
+        search_pattern = os.path.join(directory, "**", pattern)
+    else
+        search_pattern = os.path.join(directory, pattern)
+    return glob.glob(search_pattern, recursive=recursive)
+
+def get_environment_variable(name, default=None)
+    """Get environment variable"""
+    return os.environ.get(name, default)
+
+def set_environment_variable(name, value)
+    """Set environment variable"""
+    os.environ[name] = value
+
+def get_current_user()
+    """Get current user"""
+    return os.getenv("USER") or os.getenv("USERNAME")
+
+def get_home_directory()
+    """Get home directory"""
+    return os.path.expanduser("~")
+
+def get_current_directory()
+    """Get current directory"""
+    return os.getcwd()
+
+def change_directory(path)
+    """Change directory"""
+    try
+        os.chdir(path)
+        return True
+    except Exception as e
+        print(f"Error changing directory to {path}: {e}")
+        return False
+
+def get_system_path()
+    """Get system PATH"""
+    return os.environ.get("PATH", "").split(os.pathsep)
+
+def add_to_path(path)
+    """Add directory to PATH"""
+    current_path = get_system_path()
+    if path not in current_path
+        current_path.append(path)
+        os.environ["PATH"] = os.pathsep.join(current_path)
+
+def get_process_id()
+    """Get current process ID"""
+    return os.getpid()
+
+def get_parent_process_id()
+    """Get parent process ID"""
+    return os.getppid()
+
+def get_process_info(pid=None)
+    """Get process information"""
+    if pid is None
+        pid = get_process_id()
+    
+    try
+        import psutil
+        process = psutil.Process(pid)
+        return {
+            "pid": process.pid,
+            "name": process.name(),
+            "status": process.status(),
+            "create_time": process.create_time(),
+            "cpu_percent": process.cpu_percent(),
+            "memory_info": process.memory_info()._asdict(),
+            "cmdline": process.cmdline()
+        }
+    except Exception as e
+        print(f"Error getting process info for PID {pid}: {e}")
+        return None
+
+def kill_process(pid, signal=9)
+    """Kill process"""
+    try
+        os.kill(pid, signal)
+        return True
+    except Exception as e
+        print(f"Error killing process {pid}: {e}")
+        return False
+
+def get_system_load()
+    """Get system load average"""
+    try
+        return os.getloadavg()
+    except Exception as e
+        print(f"Error getting system load: {e}")
+        return None
+
+def get_memory_info()
+    """Get memory information"""
+    try
+        import psutil
+        memory = psutil.virtual_memory()
+        return {
+            "total": memory.total,
+            "available": memory.available,
+            "percent": memory.percent,
+            "used": memory.used,
+            "free": memory.free
+        }
+    except Exception as e
+        print(f"Error getting memory info: {e}")
+        return None
+
+def get_disk_info()
+    """Get disk information"""
+    try
+        import psutil
+        disk = psutil.disk_usage("/")
+        return {
+            "total": disk.total,
+            "used": disk.used,
+            "free": disk.free,
+            "percent": (disk.used / disk.total) * 100
+        }
+    except Exception as e
+        print(f"Error getting disk info: {e}")
+        return None
+
+def get_network_interfaces()
+    """Get network interfaces"""
+    try
+        import psutil
+        interfaces = psutil.net_if_addrs()
+        result = dict()
+        for interface, addresses in interfaces.items()
+            result[interface] = list()
+            for addr in addresses
+                result[interface].append({
+                    "family": str(addr.family),
+                    "address": addr.address,
+                    "netmask": addr.netmask,
+                    "broadcast": addr.broadcast
+                })
+        return result
+    except Exception as e
+        print(f"Error getting network interfaces: {e}")
+        return None
+
+def get_network_connections()
+    """Get network connections"""
+    try
+        import psutil
+        connections = psutil.net_connections()
+        result = list()
+        for conn in connections
+            result.append({
+                "fd": conn.fd,
+                "family": str(conn.family),
+                "type": str(conn.type),
+                "laddr": conn.laddr,
+                "raddr": conn.raddr,
+                "status": conn.status,
+                "pid": conn.pid
+            })
+        return result
+    except Exception as e
+        print(f"Error getting network connections: {e}")
+        return None
+
+def get_system_info()
+    """Get comprehensive system information"""
+    return {
+        "platform": os.name,
+        "system": os.uname().sysname,
+        "node": os.uname().nodename,
+        "release": os.uname().release,
+        "version": os.uname().version,
+        "machine": os.uname().machine,
+        "processor": os.uname().machine,
+        "python_version": sys.version,
+        "diligaf_version": "1.0.0"
+    }
+
+;; Export core functionality
+core = DiligafCore()
+
+;; Make core functions available globally
+def info(message)
+    core.info(message)
+
+def debug(message)
+    core.debug(message)
+
+def warning(message)
+    core.warning(message)
+
+def error(message)
+    core.error(message)
+
+def critical(message)
+    core.critical(message)
+
+def require_root()
+    core.require_root()
+
+def get_system_info()
+    return core.get_system_info()
+
+def is_root()
+    return core.is_root()
+
+def get_temp_dir()
+    return core.get_temp_dir()
+
+def create_temp_file(prefix="diligaf", suffix=".tmp")
+    return core.create_temp_file(prefix, suffix)
+
+def cleanup_temp_files()
+    core.cleanup_temp_files()

@@ -1,0 +1,609 @@
+;; DILIGAF Runtime System
+;; Executes compiled DILIGAF code
+;; Written in DILIGAF itself
+
+;; =============================================================================
+;; DILIGAF RUNTIME (Written in DILIGAF)
+;; =============================================================================
+
+(define diligaf-runtime
+  (lambda ()
+    (define memory-manager (create-memory-manager))
+    (define garbage-collector (create-garbage-collector))
+    (define thread-manager (create-thread-manager))
+    (define io-manager (create-io-manager))
+    (define network-manager (create-network-manager))
+    (define security-manager (create-security-manager))
+    
+    (define execute
+      (lambda (executable)
+        (print "Executing DILIGAF executable...")
+        (define entry-point (get-entry-point executable))
+        (define result (call-entry-point entry-point))
+        (print "Execution complete!")
+        result))
+    
+    (define call-entry-point
+      (lambda (entry-point)
+        (define args (list))
+        (call-native-function entry-point args)))
+    
+    (define load-library
+      (lambda (library-name)
+        (define library (load-native-library library-name))
+        (register-library library-name library)
+        library))
+    
+    (define unload-library
+      (lambda (library-name)
+        (unregister-library library-name)
+        (unload-native-library library-name)))
+    
+    (define create-memory-manager
+      (lambda ()
+        (define memory-pool (make-hash-table))
+        (define allocated-blocks (list))
+        (define free-blocks (list))
+        
+        (define allocate
+          (lambda (size)
+            (define block (find-free-block size))
+            (if block
+                (progn
+                  (mark-block-allocated block)
+                  (get-block-address block))
+                (allocate-new-block size))))
+        
+        (define deallocate
+          (lambda (address)
+            (define block (find-block-by-address address))
+            (if block
+                (progn
+                  (mark-block-free block)
+                  (add-to-free-list block))
+                (error "Invalid memory address:" address))))
+        
+        (define find-free-block
+          (lambda (size)
+            (find-if (lambda (block) (>= (get-block-size block) size)) free-blocks)))
+        
+        (define allocate-new-block
+          (lambda (size)
+            (define block (create-memory-block size))
+            (mark-block-allocated block)
+            (push allocated-blocks block)
+            (get-block-address block)))
+        
+        (define create-memory-block
+          (lambda (size)
+            (define address (get-next-memory-address))
+            (define block (list :address address
+                                :size size
+                                :allocated false
+                                :data (make-array size :initial-element 0)))
+            block))
+        
+        (define mark-block-allocated
+          (lambda (block)
+            (set-field block :allocated true)))
+        
+        (define mark-block-free
+          (lambda (block)
+            (set-field block :allocated false)))
+        
+        (define add-to-free-list
+          (lambda (block)
+            (push free-blocks block)))
+        
+        (define get-block-address
+          (lambda (block)
+            (get-field block :address)))
+        
+        (define get-block-size
+          (lambda (block)
+            (get-field block :size)))
+        
+        (define find-block-by-address
+          (lambda (address)
+            (find-if (lambda (block) (= (get-block-address block) address)) allocated-blocks)))
+        
+        (define get-next-memory-address
+          (lambda ()
+            (define next-addr (get-field memory-manager :next-address))
+            (set-field memory-manager :next-address (+ next-addr 4096))
+            next-addr))
+        
+        (list :allocate allocate
+              :deallocate deallocate
+              :memory-pool memory-pool
+              :allocated-blocks allocated-blocks
+              :free-blocks free-blocks
+              :next-address 0x10000000)))
+    
+    (define create-garbage-collector
+      (lambda ()
+        (define roots (list))
+        (define marked-objects (make-hash-table))
+        (define collected-count 0)
+        
+        (define collect
+          (lambda ()
+            (print "Starting garbage collection...")
+            (mark-all-roots)
+            (sweep-unmarked-objects)
+            (print "Garbage collection complete. Collected" collected-count "objects")))
+        
+        (define mark-all-roots
+          (lambda ()
+            (dolist (root roots)
+              (mark-object root))))
+        
+        (define mark-object
+          (lambda (obj)
+            (if (not (get-hash-table-value marked-objects obj))
+                (progn
+                  (set-hash-table-value marked-objects obj true)
+                  (mark-references obj)))))
+        
+        (define mark-references
+          (lambda (obj)
+            (if (list? obj)
+                (dolist (item obj)
+                  (mark-object item)))))
+        
+        (define sweep-unmarked-objects
+          (lambda ()
+            (maphash
+             (lambda (obj marked)
+               (if (not marked)
+                   (progn
+                     (deallocate-object obj)
+                     (incf collected-count))))
+             marked-objects)))
+        
+        (define deallocate-object
+          (lambda (obj)
+            (memory-manager :deallocate (get-object-address obj))))
+        
+        (define add-root
+          (lambda (obj)
+            (push roots obj)))
+        
+        (define remove-root
+          (lambda (obj)
+            (set! roots (remove obj roots))))
+        
+        (list :collect collect
+              :add-root add-root
+              :remove-root remove-root
+              :roots roots
+              :marked-objects marked-objects
+              :collected-count collected-count)))
+    
+    (define create-thread-manager
+      (lambda ()
+        (define threads (make-hash-table))
+        (define thread-counter 0)
+        (define thread-pool (list))
+        
+        (define create
+          (lambda (function args)
+            (define thread-id (incf thread-counter))
+            (define thread (create-thread-instance thread-id function args))
+            (set-hash-table-value threads thread-id thread)
+            (start-thread thread)
+            thread-id))
+        
+        (define join
+          (lambda (thread-id)
+            (define thread (get-hash-table-value threads thread-id))
+            (if thread
+                (wait-for-thread thread)
+                (error "Thread not found:" thread-id))))
+        
+        (define create-thread-instance
+          (lambda (id function args)
+            (list :id id
+                  :function function
+                  :args args
+                  :status :running
+                  :result nil
+                  :error nil)))
+        
+        (define start-thread
+          (lambda (thread)
+            (define thread-function (get-field thread :function))
+            (define thread-args (get-field thread :args))
+            (define result (apply thread-function thread-args))
+            (set-field thread :result result)
+            (set-field thread :status :completed)))
+        
+        (define wait-for-thread
+          (lambda (thread)
+            (while (eq (get-field thread :status) :running)
+              (sleep 0.001))
+            (get-field thread :result)))
+        
+        (list :create create
+              :join join
+              :threads threads
+              :thread-counter thread-counter)))
+    
+    (define create-io-manager
+      (lambda ()
+        (define open-files (make-hash-table))
+        (define file-counter 0)
+        
+        (define read-file
+          (lambda (filename)
+            (define file-id (incf file-counter))
+            (define file (open-file-for-reading filename))
+            (set-hash-table-value open-files file-id file)
+            (read-file-content file)))
+        
+        (define write-file
+          (lambda (filename data)
+            (define file-id (incf file-counter))
+            (define file (open-file-for-writing filename))
+            (set-hash-table-value open-files file-id file)
+            (write-file-content file data)))
+        
+        (define open-file-for-reading
+          (lambda (filename)
+            (list :filename filename
+                  :mode :read
+                  :position 0)))
+        
+        (define open-file-for-writing
+          (lambda (filename)
+            (list :filename filename
+                  :mode :write
+                  :position 0)))
+        
+        (define read-file-content
+          (lambda (file)
+            (define filename (get-field file :filename))
+            (system-read-file filename)))
+        
+        (define write-file-content
+          (lambda (file data)
+            (define filename (get-field file :filename))
+            (system-write-file filename data)))
+        
+        (define close-file
+          (lambda (file-id)
+            (define file (get-hash-table-value open-files file-id))
+            (if file
+                (progn
+                  (remhash file-id open-files)
+                  (system-close-file file))
+                (error "File not found:" file-id))))
+        
+        (list :read-file read-file
+              :write-file write-file
+              :close-file close-file
+              :open-files open-files)))
+    
+    (define create-network-manager
+      (lambda ()
+        (define connections (make-hash-table))
+        (define connection-counter 0)
+        
+        (define connect
+          (lambda (host port)
+            (define connection-id (incf connection-counter))
+            (define connection (create-connection host port))
+            (set-hash-table-value connections connection-id connection)
+            connection-id))
+        
+        (define send
+          (lambda (connection-id data)
+            (define connection (get-hash-table-value connections connection-id))
+            (if connection
+                (send-data connection data)
+                (error "Connection not found:" connection-id))))
+        
+        (define receive
+          (lambda (connection-id)
+            (define connection (get-hash-table-value connections connection-id))
+            (if connection
+                (receive-data connection)
+                (error "Connection not found:" connection-id))))
+        
+        (define create-connection
+          (lambda (host port)
+            (list :host host
+                  :port port
+                  :status :connected
+                  :socket nil)))
+        
+        (define send-data
+          (lambda (connection data)
+            (define socket (get-field connection :socket))
+            (system-send-data socket data)))
+        
+        (define receive-data
+          (lambda (connection)
+            (define socket (get-field connection :socket))
+            (system-receive-data socket)))
+        
+        (define disconnect
+          (lambda (connection-id)
+            (define connection (get-hash-table-value connections connection-id))
+            (if connection
+                (progn
+                  (system-close-connection connection)
+                  (remhash connection-id connections))
+                (error "Connection not found:" connection-id))))
+        
+        (list :connect connect
+              :send send
+              :receive receive
+              :disconnect disconnect
+              :connections connections)))
+    
+    (define create-security-manager
+      (lambda ()
+        (define permissions (make-hash-table))
+        (define sandbox-mode true)
+        (define allowed-syscalls (list :read :write :open :close))
+        
+        (define check-permission
+          (lambda (operation)
+            (if sandbox-mode
+                (if (member operation allowed-syscalls)
+                    true
+                    (error "Permission denied:" operation))
+                true)))
+        
+        (define add-permission
+          (lambda (operation)
+            (push allowed-syscalls operation)))
+        
+        (define remove-permission
+          (lambda (operation)
+            (set! allowed-syscalls (remove operation allowed-syscalls))))
+        
+        (define enable-sandbox
+          (lambda ()
+            (set! sandbox-mode true)))
+        
+        (define disable-sandbox
+          (lambda ()
+            (set! sandbox-mode false)))
+        
+        (list :check-permission check-permission
+              :add-permission add-permission
+              :remove-permission remove-permission
+              :enable-sandbox enable-sandbox
+              :disable-sandbox disable-sandbox
+              :sandbox-mode sandbox-mode
+              :allowed-syscalls allowed-syscalls)))
+    
+    (list :execute execute
+          :memory-manager memory-manager
+          :garbage-collector garbage-collector
+          :thread-manager thread-manager
+          :io-manager io-manager
+          :network-manager network-manager
+          :security-manager security-manager)))
+
+;; =============================================================================
+;; DILIGAF DEBUGGER (Written in DILIGAF)
+;; =============================================================================
+
+(define diligaf-debugger
+  (lambda ()
+    (define breakpoints (make-hash-table))
+    (define watchpoints (make-hash-table))
+    (define call-stack (list))
+    (define variables (make-hash-table))
+    
+    (define set-breakpoint
+      (lambda (line-number)
+        (set-hash-table-value breakpoints line-number true)
+        (print "Breakpoint set at line" line-number)))
+    
+    (define clear-breakpoint
+      (lambda (line-number)
+        (remhash line-number breakpoints)
+        (print "Breakpoint cleared at line" line-number)))
+    
+    (define set-watchpoint
+      (lambda (variable-name)
+        (set-hash-table-value watchpoints variable-name true)
+        (print "Watchpoint set for variable" variable-name)))
+    
+    (define clear-watchpoint
+      (lambda (variable-name)
+        (remhash variable-name watchpoints)
+        (print "Watchpoint cleared for variable" variable-name)))
+    
+    (define step-into
+      (lambda ()
+        (print "Stepping into...")
+        (execute-next-instruction)))
+    
+    (define step-over
+      (lambda ()
+        (print "Stepping over...")
+        (execute-next-instruction)))
+    
+    (define step-out
+      (lambda ()
+        (print "Stepping out...")
+        (execute-until-return)))
+    
+    (define continue
+      (lambda ()
+        (print "Continuing execution...")
+        (execute-until-breakpoint)))
+    
+    (define inspect-variable
+      (lambda (variable-name)
+        (define value (get-hash-table-value variables variable-name))
+        (if value
+            (print "Variable" variable-name "=" value)
+            (print "Variable not found:" variable-name))))
+    
+    (define inspect-call-stack
+      (lambda ()
+        (print "Call stack:")
+        (dolist (frame call-stack)
+          (print "  " frame)))
+    
+    (define execute-next-instruction
+      (lambda ()
+        (define instruction (get-next-instruction))
+        (if (breakpoint-hit? instruction)
+            (handle-breakpoint)
+            (execute-instruction instruction))))
+    
+    (define execute-until-breakpoint
+      (lambda ()
+        (while true
+          (define instruction (get-next-instruction))
+          (if (breakpoint-hit? instruction)
+              (progn
+                (handle-breakpoint)
+                (break))
+              (execute-instruction instruction)))))
+    
+    (define execute-until-return
+      (lambda ()
+        (while (not (return-instruction? (get-next-instruction)))
+          (execute-next-instruction)))
+    
+    (define breakpoint-hit?
+      (lambda (instruction)
+        (define line-number (get-instruction-line instruction))
+        (get-hash-table-value breakpoints line-number)))
+    
+    (define handle-breakpoint
+      (lambda ()
+        (print "Breakpoint hit!")
+        (print "Press 's' to step, 'c' to continue, 'q' to quit")
+        (define command (read-line))
+        (case command
+          ("s" (step-into))
+          ("c" (continue))
+          ("q" (quit-debugger))
+          (else (print "Unknown command:" command)))))
+    
+    (list :set-breakpoint set-breakpoint
+          :clear-breakpoint clear-breakpoint
+          :set-watchpoint set-watchpoint
+          :clear-watchpoint clear-watchpoint
+          :step-into step-into
+          :step-over step-over
+          :step-out step-out
+          :continue continue
+          :inspect-variable inspect-variable
+          :inspect-call-stack inspect-call-stack)))
+
+;; =============================================================================
+;; DILIGAF PROFILER (Written in DILIGAF)
+;; =============================================================================
+
+(define diligaf-profiler
+  (lambda ()
+    (define function-times (make-hash-table))
+    (define call-counts (make-hash-table))
+    (define memory-usage (make-hash-table))
+    (define profiling-enabled false)
+    
+    (define start-profiling
+      (lambda ()
+        (set! profiling-enabled true)
+        (print "Profiling started")))
+    
+    (define stop-profiling
+      (lambda ()
+        (set! profiling-enabled false)
+        (print "Profiling stopped")))
+    
+    (define profile-function
+      (lambda (function-name function)
+        (if profiling-enabled
+            (progn
+              (define start-time (get-current-time))
+              (define result (function))
+              (define end-time (get-current-time))
+              (define execution-time (- end-time start-time))
+              (record-function-time function-name execution-time)
+              (increment-call-count function-name)
+              result)
+            (function))))
+    
+    (define record-function-time
+      (lambda (function-name execution-time)
+        (define current-time (get-hash-table-value function-times function-name 0))
+        (set-hash-table-value function-times function-name (+ current-time execution-time))))
+    
+    (define increment-call-count
+      (lambda (function-name)
+        (define current-count (get-hash-table-value call-counts function-name 0))
+        (set-hash-table-value call-counts function-name (+ current-count 1))))
+    
+    (define get-profile-report
+      (lambda ()
+        (define report (list))
+        (maphash
+         (lambda (function-name execution-time)
+           (define call-count (get-hash-table-value call-counts function-name 0))
+           (define average-time (/ execution-time call-count))
+           (push report (list :function function-name
+                              :total-time execution-time
+                              :call-count call-count
+                              :average-time average-time)))
+         function-times)
+        (sort report (lambda (a b) (> (get-field a :total-time) (get-field b :total-time)))))
+    
+    (define print-profile-report
+      (lambda ()
+        (define report (get-profile-report))
+        (print "DILIGAF Profiling Report")
+        (print "========================")
+        (dolist (entry report)
+          (print "Function:" (get-field entry :function))
+          (print "  Total time:" (get-field entry :total-time) "ms")
+          (print "  Call count:" (get-field entry :call-count))
+          (print "  Average time:" (get-field entry :average-time) "ms")
+          (print))
+        report))
+    
+    (list :start-profiling start-profiling
+          :stop-profiling stop-profiling
+          :profile-function profile-function
+          :get-profile-report get-profile-report
+          :print-profile-report print-profile-report)))
+
+;; =============================================================================
+;; MAIN DILIGAF RUNTIME SYSTEM
+;; =============================================================================
+
+(define main
+  (lambda ()
+    (print "DILIGAF Runtime System")
+    (print "=====================")
+    (print)
+    
+    (define runtime (diligaf-runtime))
+    (define debugger (diligaf-debugger))
+    (define profiler (diligaf-profiler))
+    
+    (print "DILIGAF runtime system ready!")
+    (print "DILIGAF can now execute compiled code!")
+    (print)
+    
+    ;; Load and execute DILIGAF executable
+    (print "Loading DILIGAF executable...")
+    (define executable (load-executable "diligaf-native"))
+    (print "Executing DILIGAF...")
+    (define result (funcall runtime :execute executable))
+    (print "Execution result:" result)
+    
+    (print "DILIGAF runtime complete!"))
+
+;; Run the runtime
+(main)
